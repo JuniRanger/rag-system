@@ -1,0 +1,14 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333" # Puerto HTTP para consultas
+      - "6334:6334" # Pueto gRPC (comunicación interna rapida)
+    volumes: 
+      - qdrant_storage:/qdrant/storage #Aqui se guardan los datos en disco
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    restart: unless-stopped
+
+volumes:
+  qdrant_storage: # Volumen para persistir los datos en la base de datos
