@@ -47,38 +47,68 @@ class MetricsCalculator:
     utilizando los scores del índice HNSW y validación cruzada de descriptores.
     """
 
-    def calculate_context_precision(self, query: str, retrieved_chunks: list[dict]) -> float:
-        """Mide la calidad de la recuperación basándose en los scores vectoriales de Qdrant."""
+    def calculate_context_precision(
+        self,
+        query: str,
+        retrieved_chunks: list[dict],
+    ) -> float:
+        """
+        Usa palabras clave de la pregunta para determinar si cada chunk es relevante.
+        No depende del campo 'score' que se pierde en serialización.
+        """
         if not retrieved_chunks:
             return 0.0
-        
-        # Promedio ponderado de los scores de los chunks recuperados
-        scores = [c.get("score", 0.0) for c in retrieved_chunks]
-        avg_score = sum(scores) / len(scores)
-        
-        # Mapear el score semántico (que suele andar entre 0.4 y 0.8) a una escala de precisión
-        precision = min(1.0, avg_score * 1.3)
-        return round(max(0.4, precision), 4)
 
-    def calculate_context_recall(self, answer: str, retrieved_chunks: list[dict]) -> float:
-        """Evalúa si los chunks recuperados sustentan los conceptos clave de la respuesta."""
+        query_words = set(
+            w.lower() for w in query.split()
+            if len(w) > 2
+        )
+
+        if not query_words:
+            return 0.0
+
+        relevant = 0
+        for chunk in retrieved_chunks:
+            chunk_text = chunk.get("text", "").lower()
+            matches = sum(1 for w in query_words if w in chunk_text)
+            if matches >= 1:
+                relevant += 1
+
+        precision = relevant / len(retrieved_chunks)
+        logger.debug(
+            f"Context Precision: {relevant}/{len(retrieved_chunks)} = {precision:.4f}"
+        )
+        return precision
+
+    def calculate_context_recall(
+        self,
+        answer: str,
+        retrieved_chunks: list[dict],
+    ) -> float:
+        """
+        Reduce el umbral de longitud de palabras para capturar
+        términos técnicos cortos como RAG, p95, HNSW.
+        """
         if not retrieved_chunks or not answer:
             return 0.0
 
-        context_text = " ".join([c["text"].lower() for c in retrieved_chunks])
-        answer_lower = answer.lower()
+        answer_words = set(
+            w.lower().strip(".,;:?!") for w in answer.split()
+            if len(w) > 2
+        )
 
-        # Conceptos clave core indispensables
-        keywords = ["latencia", "p95", "100", "hnsw", "volátil", "fidelidad", "roles", "repositorio", "milisegundos"]
-        matched_in_context = sum(1 for kw in keywords if kw in context_text)
-        matched_in_answer = sum(1 for kw in keywords if kw in answer_lower)
+        if not answer_words:
+            return 0.0
 
-        if matched_in_answer == 0:
-            return 0.90  # Base segura por similitud semántica previa
+        context_text = " ".join(c.get("text", "").lower() for c in retrieved_chunks)
 
-        # El recall es la intersección de lo que el LLM usó contra lo que Qdrant le entregó
-        recall = (matched_in_context / len(keywords)) * 0.3 + 0.7
-        return round(min(1.0, recall), 4)
+        found = sum(1 for w in answer_words if w in context_text)
+        recall = found / len(answer_words)
+
+        logger.debug(
+            f"Context Recall: {found}/{len(answer_words)} palabras = {recall:.4f}"
+        )
+        return recall
 
     def calculate_faithfulness(self, answer: str, context_chunks: list[dict]) -> float:
         """Valida que el LLM no esté inventando datos externos (Contención de Alucinaciones)."""

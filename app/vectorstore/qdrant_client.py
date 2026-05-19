@@ -50,7 +50,7 @@ class QdrantManager:
                 indexing_threshold=0  # Indexación en tiempo real inmediata
             )
         )
-        logger.info("✅ Colección con HNSW optimizado creada con éxito")
+        logger.info("Colección con HNSW optimizado creada con éxito")
 
     def insert_points(self, chunks: list[dict]):
         """

@@ -16,26 +16,26 @@ async def lifespan(app: FastAPI):
     embedder = get_embedder()
     # Forzar una inferencia dummy para que el modelo quede caliente
     embedder.embed_text("inicialización del sistema")
-    logger.info("✅ Modelo de embeddings listo en RAM")
+    logger.info(" Modelo de embeddings listo en RAM")
 
     logger.info("Verificando conexión a Qdrant...")
     from app.vectorstore.qdrant_client import get_qdrant_manager
     qdrant = get_qdrant_manager()
-    logger.info("✅ Qdrant conectado")
+    logger.info("Qdrant conectado")
 
     logger.info("Verificando Ollama...")
     from app.llm.client import OllamaClient
     ollama = OllamaClient()
     if ollama.is_available():
-        logger.info("✅ Ollama disponible")
+        logger.info("Ollama disponible")
     else:
-        logger.warning("⚠️ Ollama no disponible — verifica que está corriendo")
+        logger.warning(" Ollama no disponible — verifica que está corriendo")
 
     logger.info(f"Modelo LLM     : {settings.OLLAMA_MODEL}")
     logger.info(f"Embedding model: {settings.EMBEDDING_MODEL_NAME}")
     logger.info(f"Chunk size     : {settings.CHUNK_SIZE} | Overlap: {settings.CHUNK_OVERLAP}")
     logger.info(f"Top-K          : {settings.TOP_K}")
-    logger.info("🚀 Sistema listo para recibir requests")
+    logger.info("Sistema listo para recibir requests")
 
     yield
 

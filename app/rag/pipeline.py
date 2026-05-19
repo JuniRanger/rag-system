@@ -25,10 +25,11 @@ class RAGPipeline:
                 "query": result["query"],
                 "answer": result["answer"],
                 "sources": result["sources"],
+                "context_used": result.get("context_used", []),
                 "metadata": {
                     "chunks_retrieved": result["chunks_retrieved"],
                     "chunks_used": result["chunks_used"],
-                }
+                },
             }
         except Exception as e:
             logger.error(f"Error en RAG Pipeline: {e}")
@@ -40,8 +41,9 @@ class RAGPipeline:
             "query": "",
             "answer": message,
             "sources": [],
+            "context_used": [],
             "metadata": {
                 "chunks_retrieved": 0,
                 "chunks_used": 0,
-            }
+            },
         }

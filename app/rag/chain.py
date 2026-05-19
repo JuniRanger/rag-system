@@ -31,7 +31,8 @@ class RAGChain:
                 "answer": "No encontré información suficiente en los documentos para responder esta pregunta.",
                 "sources": [],
                 "chunks_retrieved": 0,
-                "chunks_used": 0
+                "chunks_used": 0,
+                "context_used": [],
             }
 
         chunks_retrieved = len(chunks)

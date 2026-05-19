@@ -1,5 +1,3 @@
-# app/core/prompts.py
-
 RAG_SYSTEM_PROMPT = """Eres un asistente experto que responde preguntas ÚNICAMENTE basándose en el contexto proporcionado.
 
 REGLAS ESTRICTAS:
