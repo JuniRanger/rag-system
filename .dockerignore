@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+notebooks/
+data/raw/
+data/chunks/
+data/processed/
+logs/
+*.md
+!README.md
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

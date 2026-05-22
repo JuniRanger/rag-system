@@ -4,7 +4,7 @@ from pypdf import PdfReader
 from app.core.logger import logger
 
 class DocumentLoader:
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx", ".pptx", ".csv", ".xlsx"}
 
     def load_file(self, file_path: str) -> dict:
         """Carga un archivo y retorna su texto y metadatos."""
