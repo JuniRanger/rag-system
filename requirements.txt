@@ -25,3 +25,6 @@ httpx==0.27.2
 # Evaluación RAG
 ragas==0.1.21
 datasets==3.0.1
+
+# Data processing
+pandas==2.2.3
