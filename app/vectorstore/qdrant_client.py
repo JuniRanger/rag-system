@@ -85,6 +85,16 @@ class QdrantManager:
 
         logger.info(f"Total puntos insertados en Qdrant: {len(points)}")
 
+    def upsert_points(self, points: list[PointStruct]) -> None:
+        """Upsert de uno o mas puntos (ingesta incremental / webhooks)."""
+        if not points:
+            return
+        self.client.upsert(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            points=points,
+        )
+        logger.info(f"Upsert en Qdrant: {len(points)} punto(s)")
+
     def search(self, query_vector: list[float], top_k: int = None) -> list[dict]:
         """
         Busca los chunks más similares al vector de la consulta.

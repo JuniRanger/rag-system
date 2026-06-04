@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header, Request
 from app.api.schemas import (
     QueryRequest, QueryResponse,
     IngestRequest, IngestResponse,
     EvaluateRequest, EvaluateResponse,
-    HealthResponse
+    HealthResponse,
+    SupabaseWebhookPayload,
+    SupabaseWebhookResponse,
 )
 from app.rag.pipeline import RAGPipeline
 from app.ingestion.pipeline import IngestionPipeline
@@ -13,6 +15,8 @@ from app.llm.client import OllamaClient
 from app.vectorstore.qdrant_client import get_qdrant_manager
 from app.core.config import settings
 from app.core.logger import logger
+from app.ingestion.incremental import IncrementalIngestService, IncrementalIngestError
+from app.embeddings.ollama_embedder import OllamaEmbeddingError
 
 router = APIRouter()
 
@@ -145,6 +149,70 @@ async def evaluate_system(request: EvaluateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── WEBHOOK SUPABASE (INGESTA INCREMENTAL) ───────────────────────────────────
+
+@router.post(
+    "/webhooks/supabase",
+    response_model=SupabaseWebhookResponse,
+    tags=["Ingesta"],
+)
+async def supabase_incremental_webhook(
+    payload: SupabaseWebhookPayload,
+    request: Request,
+    x_webhook_secret: str | None = Header(default=None),
+) -> SupabaseWebhookResponse:
+    """
+    Recibe INSERT de Supabase, genera embedding y hace upsert en Qdrant.
+    Solo procesa type=INSERT; UPDATE/DELETE se ignoran con 200.
+    """
+    if settings.SUPABASE_WEBHOOK_SECRET:
+        secret = x_webhook_secret or request.headers.get("authorization", "")
+        if secret != settings.SUPABASE_WEBHOOK_SECRET:
+            raise HTTPException(status_code=401, detail="Webhook no autorizado")
+
+    if payload.type != "INSERT":
+        return SupabaseWebhookResponse(
+            success=True,
+            skipped=True,
+            message=f"Evento {payload.type} ignorado (solo INSERT)",
+            table=payload.table,
+        )
+
+    service = IncrementalIngestService()
+    try:
+        result = await service.ingest_record(
+            table=payload.table,
+            record=payload.record,
+        )
+    except IncrementalIngestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OllamaEmbeddingError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Webhook Supabase fallo: {exc}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Qdrant u otro servicio no disponible: {exc}",
+        ) from exc
+
+    if result.get("skipped"):
+        return SupabaseWebhookResponse(
+            success=True,
+            skipped=True,
+            message=result.get("reason", "omitido"),
+            table=payload.table,
+        )
+
+    return SupabaseWebhookResponse(
+        success=True,
+        skipped=False,
+        message="Registro indexado en Qdrant",
+        point_id=result.get("point_id"),
+        supabase_id=result.get("supabase_id"),
+        table=result.get("table"),
+    )
+
+
 # ─── INFO DE COLECCIÓN ────────────────────────────────────────────────────────
 
 @router.get("/collection/info", tags=["Sistema"])
@@ -155,3 +223,5 @@ async def collection_info():
         return {"success": True, "collection": info}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+    

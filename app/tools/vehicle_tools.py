@@ -1,8 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
-
-BASE_DATASET_PATH = Path("datasets")
+# CSV empaquetados bajo app/datasets (independiente del cwd al arrancar uvicorn)
+BASE_DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets"
 
 
 # =========================
@@ -31,12 +31,12 @@ def diagnose_vehicle_problem(car_name: str, problem: str) -> str:
     Diagnostica problemas vehiculares.
 
     Args:
-        car_name: Nombre del vehículo
+        car_name: Nombre del vehÃ­culo
         problem: Problema reportado
     """
 
     matches = diagnostic_df[
-        diagnostic_df["Problem"].str.contains(
+        diagnostic_df["Problem Description"].str.contains(
             problem,
             case=False,
             na=False
@@ -44,18 +44,20 @@ def diagnose_vehicle_problem(car_name: str, problem: str) -> str:
     ]
 
     if matches.empty:
-        return "No encontré diagnóstico para ese problema."
+        return "No encontrÃ© diagnÃ³stico para ese problema."
 
     row = matches.iloc[0]
 
     return (
-        f"Vehículo: {car_name}\n"
-        f"Problema: {problem}\n"
-        f"Diagnóstico: {row['Diagnostic']}\n"
-        f"Solución: {row['Solution']}\n"
-        f"Severidad: {row['Severity']}"
+        f"VehÃ­culo: {row['Car Name']}\n"
+        f"ClasificaciÃ³n: {row['Problem Classification']}\n"
+        f"Problema: {row['Problem Description']}\n"
+        f"DiagnÃ³stico: {row['Diagnosis']}\n"
+        f"SoluciÃ³n: {row['How to Fix the Problem']}\n"
+        f"Severidad: {row['Severity']}\n"
+        f"Estado reparaciÃ³n: {row['Repair Status']}\n"
+        f"Resultado: {row['Results']}"
     )
-
 
 def get_component_cost(component: str) -> str:
     """
@@ -74,7 +76,7 @@ def get_component_cost(component: str) -> str:
     ]
 
     if matches.empty:
-        return "No encontré el componente solicitado."
+        return "No encontre el componente solicitado."
 
     row = matches.iloc[0]
 
@@ -84,70 +86,238 @@ def get_component_cost(component: str) -> str:
     )
 
 
-def get_vehicle_service_history(car_model: str) -> str:
-    """
-    Consulta historial de servicios vehiculares.
-
-    Args:
-        car_model: Modelo del vehículo
-    """
-
-    matches = service_df[
-        service_df["Car Model"].str.contains(
-            car_model,
-            case=False,
-            na=False
-        )
-    ]
-
-    if matches.empty:
-        return "No encontré historial de servicios."
-
-    row = matches.iloc[0]
-
-    return (
-        f"Vehículo: {row['Car Model']}\n"
-        f"Servicio: {row['Service Task']}\n"
-        f"Kilometraje: {row['Mileage Interval']}"
-    )
 
 
 def recommend_maintenance(vehicle_issue: str) -> str:
     """
-    Recomienda mantenimiento basado en síntomas.
+    Recomienda mantenimiento basado en sintomas.
 
     Args:
-        vehicle_issue: Problema o síntoma detectado
+        vehicle_issue: Problema o sintoma detectado
     """
 
     if "brake" in vehicle_issue.lower():
-        return "Se recomienda revisión completa del sistema de frenos."
+        return "Se recomienda revision completa del sistema de frenos."
 
     if "battery" in vehicle_issue.lower():
-        return "Se recomienda revisar batería y sistema eléctrico."
+        return "Se recomienda revisar bateria y sistema electrico."
 
     if "engine" in vehicle_issue.lower():
-        return "Se recomienda diagnóstico completo del motor."
+        return "Se recomienda diagnostico completo del motor."
 
-    return "Se recomienda inspección general preventiva."
+    return "Se recomienda inspeccion general preventiva."
 
 
 def check_vehicle_health(vehicle_status: str) -> str:
     """
-    Evalúa el estado general del vehículo.
+    Evalua el estado general del vehiculo.
 
     Args:
         vehicle_status: Estado reportado
     """
 
     if "overheat" in vehicle_status.lower():
-        return "Estado crítico: posible sobrecalentamiento."
+        return "Estado critico: posible sobrecalentamiento."
 
     if "noise" in vehicle_status.lower():
-        return "Advertencia: revisar componentes mecánicos."
+        return "Advertencia: revisar componentes mecanicos."
 
     return "Estado general estable."
 
+
+def get_vehicle_service_history(car_model: str) -> str:
+    """
+    Consulta historial de servicios vehiculares.
+
+    Args:
+        car_model: Modelo o marca del vehÃ­culo
+    """
+
+    matches = service_df[
+        (
+            service_df["brand"].str.contains(
+                car_model,
+                case=False,
+                na=False
+            )
+        )
+        |
+        (
+            service_df["model"].str.contains(
+                car_model,
+                case=False,
+                na=False
+            )
+        )
+    ]
+
+    if matches.empty:
+        return "No encontrÃ© historial de servicios."
+
+    row = matches.iloc[0]
+
+    return (
+        f"Marca: {row['brand']}\n"
+        f"Modelo: {row['model']}\n"
+        f"Motor: {row['engine_type']}\n"
+        f"Kilometraje: {row['mileage']}\n"
+        f"Costo servicio: {row['cost']}"
+    )
+
+def get_vehicle_cost_estimate(brand: str) -> str:
+    """
+    Estima costo de mantenimiento por marca.
+    """
+
+    matches = service_df[
+        service_df["brand"].str.contains(
+            brand,
+            case=False,
+            na=False
+        )
+    ]
+
+    if matches.empty:
+        return "No encontrÃ© datos de costos."
+
+    avg_cost = matches["cost"].mean()
+
+    return (
+        f"Costo promedio de mantenimiento "
+        f"para {brand}: {round(avg_cost, 2)}"
+    )
+
+
+def detect_engine_issue(issue: str) -> str:
+    """
+    Detecta problemas relacionados al motor.
+    """
+
+    if "overheat" in issue.lower():
+        return "Posible problema de refrigeraciÃ³n."
+
+    if "noise" in issue.lower():
+        return "Posible desgaste interno del motor."
+
+    return "No se detectÃ³ falla crÃ­tica."
+
+
+def recommend_oil_change(mileage: int) -> str:
+    """
+    Recomienda cambio de aceite.
+    """
+
+    if mileage >= 10000:
+        return "Se recomienda cambio inmediato de aceite."
+
+    return "El aceite aÃºn estÃ¡ en buen estado."
+
+
+def predict_component_failure(component: str) -> str:
+    """
+    Predice posibles fallas de componentes.
+    """
+
+    critical = [
+        "battery",
+        "brake",
+        "engine",
+        "transmission"
+    ]
+
+    if component.lower() in critical:
+        return (
+            f"El componente {component} "
+            f"tiene alta probabilidad de desgaste."
+        )
+
+    return (
+        f"No se detectan riesgos crÃ­ticos "
+        f"para {component}."
+    )
+
+
+def get_repair_status(car_name: str) -> str:
+    """
+    Obtiene estado de reparaciÃ³n.
+    """
+
+    matches = diagnostic_df[
+        diagnostic_df["Car Name"].str.contains(
+            car_name,
+            case=False,
+            na=False
+        )
+    ]
+
+    if matches.empty:
+        return "No encontrÃ© estado de reparaciÃ³n."
+
+    row = matches.iloc[0]
+
+    return (
+        f"VehÃ­culo: {row['Car Name']}\n"
+        f"Estado reparaciÃ³n: {row['Repair Status']}\n"
+        f"Resultado: {row['Results']}"
+    )
+
+
+def get_vehicle_region(model: str) -> str:
+    """
+    Obtiene regiÃ³n del vehÃ­culo.
+    """
+
+    matches = service_df[
+        service_df["model"].str.contains(
+            model,
+            case=False,
+            na=False
+        )
+    ]
+
+    if matches.empty:
+        return "No encontrÃ© regiÃ³n."
+
+    row = matches.iloc[0]
+
+    return (
+        f"Modelo: {row['model']}\n"
+        f"RegiÃ³n: {row['region']}"
+    )
+
+
+def recommend_brake_service(problem: str) -> str:
+    """
+    Recomienda servicio de frenos.
+    """
+
+    if "brake" in problem.lower():
+        return (
+            "Se recomienda revisar "
+            "pastillas y lÃ­quido de frenos."
+        )
+
+    return "No se requiere servicio de frenos."
+
+
+def estimate_maintenance_priority(issue: str) -> str:
+    """
+    Estima prioridad de mantenimiento.
+    """
+
+    critical = [
+        "overheat",
+        "brake",
+        "engine"
+    ]
+
+    if any(
+        word in issue.lower()
+        for word in critical
+    ):
+        return "Prioridad ALTA."
+
+    return "Prioridad MEDIA."
 
 def get_service_recommendation(mileage: int) -> str:
     """
@@ -164,7 +334,7 @@ def get_service_recommendation(mileage: int) -> str:
         return "Servicio intermedio recomendado."
 
     if mileage >= 10000:
-        return "Servicio básico recomendado."
+        return "Servicio basico recomendado."
 
     return "No se requiere servicio inmediato."
 
@@ -188,6 +358,6 @@ def estimate_repair_severity(problem: str) -> str:
         keyword in problem.lower()
         for keyword in critical_keywords
     ):
-        return "Severidad alta. Requiere atención inmediata."
+        return "Severidad alta. Requiere atencion inmediata."
 
     return "Severidad moderada."

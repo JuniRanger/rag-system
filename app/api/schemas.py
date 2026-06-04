@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Literal, Optional
 
 # ─── REQUEST SCHEMAS (lo que recibe la API) ───────────────────────────────────
 
@@ -81,3 +81,26 @@ class HealthResponse(BaseModel):
     qdrant_available: bool
     model: str
     collection: str
+
+
+# --- Supabase Database Webhooks (ingesta incremental) ---
+
+class SupabaseWebhookPayload(BaseModel):
+    """Payload tipico de Supabase Database Webhooks."""
+
+    model_config = ConfigDict(extra="allow")
+
+    type: Literal["INSERT", "UPDATE", "DELETE"]
+    table: str
+    schema_: str = Field(default="public", alias="schema")
+    record: dict[str, Any]
+    old_record: dict[str, Any] | None = None
+
+
+class SupabaseWebhookResponse(BaseModel):
+    success: bool
+    skipped: bool = False
+    message: str
+    point_id: str | None = None
+    supabase_id: str | None = None
+    table: str | None = None

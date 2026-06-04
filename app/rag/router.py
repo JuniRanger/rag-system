@@ -1,66 +1,86 @@
-from app.retrieval.search import VectorSearch
-from app.retrieval.reranker import Reranker
-from app.llm.generator import ResponseGenerator
-from app.core.config import settings
-from app.core.logger import logger
+"""
+Ruteo entre RAG (documentos) y Function Calling (herramientas automotrices).
 
-class RAGChain:
-    def __init__(self, use_reranker: bool = True):
-        self.searcher = VectorSearch()
-        self.reranker = Reranker() if use_reranker else None
-        self.generator = ResponseGenerator()
-        self.use_reranker = use_reranker
+La decisión es heurística por palabras clave: rápida y sin llamadas extra al LLM.
+"""
+import unicodedata
 
-    def run(self, query: str) -> dict:
-        """
-        Ejecuta el flujo RAG completo:
-        pregunta → búsqueda → reranking → generación → respuesta
-        """
-        logger.info(f"=== RAG Chain iniciada | query: '{query}' ===")
+FUNCTION_KEYWORDS = [
 
-        # Paso 1: Recuperar chunks relevantes con umbral
-        chunks = self.searcher.search_with_threshold(
-            query=query,
-            threshold=0.4
+    # Costos
+    "costo",
+    "precio",
+    "cotizacion",
+    "presupuesto",
+
+    # Diagnóstico
+    "diagnóstico",
+    "diagnostico",
+    "problema",
+    "falla",
+    "averia",
+    "avería",
+
+    # Historial / servicios
+    "historial",
+    "servicio",
+    "mantenimiento",
+    "reparacion",
+    "reparación",
+
+    # Componentes
+    "componente",
+    "motor",
+    "frenos",
+    "clutch",
+    "radiador",
+    "bateria",
+    "batería",
+    "aceite",
+    "llantas",
+    "transmision",
+    "transmisión",
+    "coolant",
+    "brake",
+    "engine",
+    "battery",
+
+    # Kilometraje
+    "kilometraje",
+    "km",
+
+    # Prioridad / severidad
+    "severidad",
+    "prioridad",
+
+    # Regiones
+    "region",
+    "región",
+
+    # Predicción
+    "predice",
+    "prediccion",
+    "predicción",
+
+    # Estado
+    "estado",
+]
+
+
+def _fold_accents(text: str) -> str:
+    """Normaliza a minúsculas y quita tildes para comparar con queries sin acentos."""
+    lowered = text.lower()
+    return "".join(
+            c
+            for c in unicodedata.normalize("NFD", lowered)
+            if unicodedata.category(c) != "Mn"
         )
 
-        if not chunks:
-            logger.warning("Sin resultados relevantes en la base de datos")
-            return {
-                "query": query,
-                "answer": "No encontré información suficiente en los documentos para responder esta pregunta.",
-                "sources": [],
-                "chunks_retrieved": 0,
-                "chunks_used": 0,
-                "context_used": [],
-            }
 
-        chunks_retrieved = len(chunks)
-        logger.info(f"Chunks recuperados: {chunks_retrieved}")
-
-        # Paso 2: Reranking (opcional pero recomendado)
-        if self.use_reranker:
-            chunks = self.reranker.rerank(query, chunks)
-            # Usar solo los top 3 tras reranking para no sobrecargar el contexto
-            chunks = chunks[:3]
-
-        chunks_used = len(chunks)
-        logger.info(f"Chunks usados tras reranking: {chunks_used}")
-
-        # Paso 3: Generar respuesta
-        result = self.generator.generate(query, chunks)
-
-        # Paso 4: Construir respuesta final con metadatos
-        sources = list(set([c.get("filename", "") for c in chunks]))
-
-        response = {
-            "query": query,
-            "answer": result["answer"],
-            "sources": sources,
-            "chunks_retrieved": chunks_retrieved,
-            "chunks_used": chunks_used,
-            "context_used": result["context_used"]
-        }
-
-        logger.info(f"=== RAG Chain completada | fuentes: {sources} ===")
-        return response
+def should_use_tools(query: str) -> bool:
+    """
+    True si la pregunta parece pedir datos de mantenimiento / costos / diagnóstico
+    (dominio de las tools CSV), en lugar de lectura de documentos indexados.
+    """
+    folded = _fold_accents(query)
+    return any(_fold_accents(keyword) in folded for keyword in FUNCTION_KEYWORDS)
