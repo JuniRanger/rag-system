@@ -18,10 +18,17 @@ class Settings(BaseSettings):
 
     # --- Supabase webhook (ingesta incremental) ---
     SUPABASE_WEBHOOK_SECRET: str = ""
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_SCHEMA: str = "public"
+    SUPABASE_SYNC_TABLE: str = "documentos_tecnicos"
     SUPABASE_RECORD_ID_FIELD: str = "id"
-    SUPABASE_RECORD_TEXT_FIELD: str = "content"
-    SUPABASE_RECORD_TEXT_FIELD_ALT: str = "text"
-    SUPABASE_WEBHOOK_ALLOWED_TABLES: str = ""
+    SUPABASE_RECORD_TEXT_FIELD: str = "problema"
+    SUPABASE_RECORD_TEXT_FIELD_ALT: str = (
+        "vehiculo_marca,vehiculo_modelo,categoria_problema,diagnostico,solucion,"
+        "ecu_data,severidad,repair_status,historial_servicio"
+    )
+    SUPABASE_WEBHOOK_ALLOWED_TABLES: str = "documentos_tecnicos"
 
     # --- Qdrant (tu base de datos vectorial) ---
     QDRANT_HOST: str = "localhost"
@@ -38,6 +45,10 @@ class Settings(BaseSettings):
 
     # --- Retrieval (cuántos fragmentos recuperamos) ---
     TOP_K: int = 10
+    # Filtra /query a esta tabla Supabase (documentos_tecnicos); vacio = sin filtro
+    RAG_SEARCH_SUPABASE_TABLE: str = "documentos_tecnicos"
+    # Umbral cosine similarity; multilingual suele puntuar mas bajo (~0.25-0.35)
+    RAG_SCORE_THRESHOLD: float = 0.25
 
     # --- Rutas de datos ---
     RAW_DATA_PATH: str = "data/raw"
@@ -49,9 +60,15 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
     def supabase_text_field_candidates(self) -> list[str]:
-        fields = [self.SUPABASE_RECORD_TEXT_FIELD]
+        """Campos de texto a probar; ALT admite varios separados por coma."""
+        fields: list[str] = []
+        if self.SUPABASE_RECORD_TEXT_FIELD:
+            fields.append(self.SUPABASE_RECORD_TEXT_FIELD)
         if self.SUPABASE_RECORD_TEXT_FIELD_ALT:
-            fields.append(self.SUPABASE_RECORD_TEXT_FIELD_ALT)
+            for part in self.SUPABASE_RECORD_TEXT_FIELD_ALT.split(","):
+                name = part.strip()
+                if name and name not in fields:
+                    fields.append(name)
         return fields
 
     def supabase_allowed_tables(self) -> list[str]:

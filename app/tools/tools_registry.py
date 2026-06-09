@@ -13,7 +13,8 @@ from app.tools.vehicle_tools import (
     get_repair_status,
     get_vehicle_region,
     recommend_brake_service,
-    estimate_maintenance_priority
+    estimate_maintenance_priority,
+    search_documentos_tecnicos,
 )
 
 
@@ -63,6 +64,9 @@ TOOLS = {
 
     "estimate_maintenance_priority":
         estimate_maintenance_priority,
+
+    "search_documentos_tecnicos":
+        search_documentos_tecnicos,
 }
 
 
@@ -291,14 +295,19 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
-            "name": "estimate_repair_severity",
-            "description": "Estima severidad de reparacion",
+            "name": "search_documentos_tecnicos",
+            "description": (
+                "Busca casos en Supabase documentos_tecnicos por marca, modelo "
+                "o descripcion del problema (datos en vivo de la base de datos)."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "problem": {"type": "string"},
+                    "marca": {"type": "string", "description": "Marca del vehiculo, ej. Chevrolet"},
+                    "modelo": {"type": "string", "description": "Modelo, ej. Pop"},
+                    "problema": {"type": "string", "description": "Sintoma o falla, ej. skibidi"},
                 },
-                "required": ["problem"],
+                "required": [],
             },
         },
     },

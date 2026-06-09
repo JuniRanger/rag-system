@@ -1,3 +1,4 @@
+from app.core.config import settings
 from app.retrieval.search import VectorSearch
 from app.retrieval.reranker import Reranker
 from app.llm.generator import ResponseGenerator
@@ -37,7 +38,7 @@ class RAGChain:
 
         chunks = self.searcher.search_with_threshold(
             query=query,
-            threshold=0.4
+            threshold=settings.RAG_SCORE_THRESHOLD,
         )
 
         if not chunks:

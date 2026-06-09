@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Any, Literal, Optional
+from uuid import UUID
 
 # ─── REQUEST SCHEMAS (lo que recibe la API) ───────────────────────────────────
 
@@ -83,18 +84,47 @@ class HealthResponse(BaseModel):
     collection: str
 
 
-# --- Supabase Database Webhooks (ingesta incremental) ---
+# --- Supabase: rag.documentos_tecnicos ---
 
-class SupabaseWebhookPayload(BaseModel):
-    """Payload tipico de Supabase Database Webhooks."""
+class DocumentoTecnicoRecordSchema(BaseModel):
+    """Espejo del DDL rag.documentos_tecnicos."""
 
     model_config = ConfigDict(extra="allow")
+
+    id: UUID | None = None
+    vehiculo_marca: str | None = None
+    vehiculo_modelo: str | None = None
+    categoria_problema: str | None = None
+    problema: str | None = None
+    diagnostico: str | None = None
+    solucion: str | None = None
+    ecu_data: str | None = None
+    severidad: str | None = None
+    repair_status: str | None = None
+    historial_servicio: str | None = None
+    creado_en: str | None = None
+
+
+class SupabaseWebhookPayload(BaseModel):
+    """Payload de Supabase Database Webhooks."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     type: Literal["INSERT", "UPDATE", "DELETE"]
     table: str
     schema_: str = Field(default="public", alias="schema")
-    record: dict[str, Any]
-    old_record: dict[str, Any] | None = None
+    record: DocumentoTecnicoRecordSchema | dict[str, Any]
+    old_record: DocumentoTecnicoRecordSchema | dict[str, Any] | None = None
+
+    @field_validator("table")
+    @classmethod
+    def normalize_table(cls, value: str) -> str:
+        return value.strip()
+
+    def record_dict(self) -> dict[str, Any]:
+        if isinstance(self.record, DocumentoTecnicoRecordSchema):
+            return self.record.model_dump(exclude_none=True)
+        return self.record
 
 
 class SupabaseWebhookResponse(BaseModel):
@@ -104,3 +134,29 @@ class SupabaseWebhookResponse(BaseModel):
     point_id: str | None = None
     supabase_id: str | None = None
     table: str | None = None
+
+
+class SupabaseSyncRequest(BaseModel):
+    """Sync manual: trae filas de public.documentos_tecnicos e indexa en Qdrant."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    table: str | None = Field(
+        default=None,
+        description="Tabla; default SUPABASE_SYNC_TABLE (documentos_tecnicos)",
+    )
+    schema_name: str | None = Field(
+        default=None,
+        alias="schema",
+        description="Schema Postgres; default SUPABASE_SCHEMA (public)",
+    )
+
+
+class SupabaseSyncResponse(BaseModel):
+    success: bool
+    schema: str
+    table: str
+    total_rows: int
+    indexed: int
+    skipped: int
+    errors: list[str]

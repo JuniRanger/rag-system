@@ -3,8 +3,12 @@ from qdrant_client.models import (
     Distance,
     VectorParams,
     PointStruct,
-    HnswConfigDiff,  
-    OptimizersConfigDiff 
+    HnswConfigDiff,
+    OptimizersConfigDiff,
+    Filter,
+    FieldCondition,
+    MatchValue,
+    FilterSelector,
 )
 from functools import lru_cache
 from app.core.config import settings
@@ -95,18 +99,21 @@ class QdrantManager:
         )
         logger.info(f"Upsert en Qdrant: {len(points)} punto(s)")
 
-    def search(self, query_vector: list[float], top_k: int = None) -> list[dict]:
-        """
-        Busca los chunks más similares al vector de la consulta.
-        Retorna los top_k resultados con su score de similitud.
-        """
+    def search(
+        self,
+        query_vector: list[float],
+        top_k: int | None = None,
+        payload_filter: Filter | None = None,
+    ) -> list[dict]:
+        """Busca chunks similares; payload_filter limita por metadata (ej. supabase_table)."""
         k = top_k or settings.TOP_K
 
         results = self.client.search(
             collection_name=settings.QDRANT_COLLECTION_NAME,
             query_vector=query_vector,
             limit=k,
-            with_payload=True  # Incluye el texto y metadatos en la respuesta
+            query_filter=payload_filter,
+            with_payload=True,
         )
 
         return [
@@ -114,10 +121,31 @@ class QdrantManager:
                 "text": r.payload["text"],
                 "filename": r.payload.get("filename", ""),
                 "chunk_index": r.payload.get("chunk_index", 0),
-                "score": r.score  # Score de similitud coseno (0 a 1)
+                "score": r.score,
+                "supabase_table": r.payload.get("supabase_table", ""),
+                "vehiculo_marca": r.payload.get("vehiculo_marca", ""),
+                "vehiculo_modelo": r.payload.get("vehiculo_modelo", ""),
             }
             for r in results
         ]
+
+    def delete_by_payload_match(self, key: str, value: str) -> int:
+        """Elimina puntos cuyo payload[key] == value (limpieza de indexaciones viejas)."""
+        self.client.delete(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key=key,
+                            match=MatchValue(value=value),
+                        )
+                    ]
+                )
+            ),
+        )
+        logger.info(f"Eliminados puntos con {key}={value}")
+        return 0
 
     def get_collection_info(self) -> dict:
         """Retorna estadísticas de la colección — útil para debugging."""

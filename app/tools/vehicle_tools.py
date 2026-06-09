@@ -1,6 +1,13 @@
 import pandas as pd
 from pathlib import Path
 
+from app.tools.supabase_reader import (
+    fetch_documentos_tecnicos,
+    format_documento_row,
+    is_configured as supabase_tools_enabled,
+    split_car_name,
+)
+
 # CSV empaquetados bajo app/datasets (independiente del cwd al arrancar uvicorn)
 BASE_DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets"
 
@@ -29,11 +36,18 @@ service_df = pd.read_csv(
 def diagnose_vehicle_problem(car_name: str, problem: str) -> str:
     """
     Diagnostica problemas vehiculares.
-
-    Args:
-        car_name: Nombre del vehículo
-        problem: Problema reportado
+    Supabase documentos_tecnicos primero; CSV local como respaldo.
     """
+    if supabase_tools_enabled():
+        marca, modelo = split_car_name(car_name)
+        rows = fetch_documentos_tecnicos(
+            marca=marca,
+            modelo=modelo,
+            texto=problem,
+            limit=3,
+        )
+        if rows:
+            return "\n\n---\n\n".join(format_documento_row(r) for r in rows)
 
     matches = diagnostic_df[
         diagnostic_df["Problem Description"].str.contains(
@@ -128,10 +142,22 @@ def check_vehicle_health(vehicle_status: str) -> str:
 def get_vehicle_service_history(car_model: str) -> str:
     """
     Consulta historial de servicios vehiculares.
-
-    Args:
-        car_model: Modelo o marca del vehículo
+    Supabase documentos_tecnicos primero; CSV local como respaldo.
     """
+    if supabase_tools_enabled():
+        marca, modelo = split_car_name(car_model)
+        rows = fetch_documentos_tecnicos(marca=marca, modelo=modelo or car_model, limit=5)
+        if not rows and car_model.strip():
+            rows = fetch_documentos_tecnicos(texto=car_model, limit=5)
+        if rows:
+            lines = []
+            for row in rows:
+                hist = row.get("historial_servicio")
+                block = format_documento_row(row)
+                if hist:
+                    block += f"\nHistorial servicio: {hist}"
+                lines.append(block)
+            return "\n\n---\n\n".join(lines)
 
     matches = service_df[
         (
@@ -240,7 +266,23 @@ def predict_component_failure(component: str) -> str:
 def get_repair_status(car_name: str) -> str:
     """
     Obtiene estado de reparación.
+    Supabase documentos_tecnicos primero; CSV local como respaldo.
     """
+    if supabase_tools_enabled():
+        marca, modelo = split_car_name(car_name)
+        rows = fetch_documentos_tecnicos(marca=marca, modelo=modelo, limit=3)
+        if not rows:
+            rows = fetch_documentos_tecnicos(texto=car_name, limit=3)
+        if rows:
+            lines = []
+            for row in rows:
+                lines.append(
+                    f"Vehículo: {row.get('vehiculo_marca', '')} {row.get('vehiculo_modelo', '')}\n"
+                    f"Estado reparación: {row.get('repair_status', 'N/D')}\n"
+                    f"Severidad: {row.get('severidad', 'N/D')}\n"
+                    f"Problema: {row.get('problema', 'N/D')}"
+                )
+            return "\n\n---\n\n".join(lines)
 
     matches = diagnostic_df[
         diagnostic_df["Car Name"].str.contains(
@@ -342,10 +384,20 @@ def get_service_recommendation(mileage: int) -> str:
 def estimate_repair_severity(problem: str) -> str:
     """
     Estima severidad del problema.
-
-    Args:
-        problem: Problema reportado
+    Supabase documentos_tecnicos primero; reglas locales como respaldo.
     """
+    if supabase_tools_enabled():
+        rows = fetch_documentos_tecnicos(texto=problem, limit=3)
+        if rows:
+            lines = []
+            for row in rows:
+                lines.append(
+                    f"Vehículo: {row.get('vehiculo_marca', '')} {row.get('vehiculo_modelo', '')}\n"
+                    f"Severidad: {row.get('severidad', 'N/D')}\n"
+                    f"Problema: {row.get('problema', 'N/D')}\n"
+                    f"Diagnóstico: {row.get('diagnostico', 'N/D')}"
+                )
+            return "\n\n---\n\n".join(lines)
 
     critical_keywords = [
         "engine",
@@ -361,3 +413,27 @@ def estimate_repair_severity(problem: str) -> str:
         return "Severidad alta. Requiere atencion inmediata."
 
     return "Severidad moderada."
+
+
+def search_documentos_tecnicos(
+    marca: str = "",
+    modelo: str = "",
+    problema: str = "",
+) -> str:
+    """
+    Busca casos técnicos en Supabase documentos_tecnicos.
+    Usar cuando el usuario pregunte por un vehículo o falla indexada en BD.
+    """
+    if not supabase_tools_enabled():
+        return "Supabase no configurado (SUPABASE_URL / SUPABASE_SERVICE_KEY)."
+
+    rows = fetch_documentos_tecnicos(
+        marca=marca or None,
+        modelo=modelo or None,
+        texto=problema or None,
+        limit=5,
+    )
+    if not rows:
+        return "No encontré registros en documentos_tecnicos para esos criterios."
+
+    return "\n\n---\n\n".join(format_documento_row(r) for r in rows)

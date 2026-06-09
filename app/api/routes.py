@@ -6,6 +6,8 @@ from app.api.schemas import (
     HealthResponse,
     SupabaseWebhookPayload,
     SupabaseWebhookResponse,
+    SupabaseSyncRequest,
+    SupabaseSyncResponse,
 )
 from app.rag.pipeline import RAGPipeline
 from app.ingestion.pipeline import IngestionPipeline
@@ -16,6 +18,11 @@ from app.vectorstore.qdrant_client import get_qdrant_manager
 from app.core.config import settings
 from app.core.logger import logger
 from app.ingestion.incremental import IncrementalIngestService, IncrementalIngestError
+from app.ingestion.supabase_sync import (
+    sync_table_to_qdrant,
+    SupabaseSyncError,
+    list_supabase_tables,
+)
 from app.embeddings.ollama_embedder import OllamaEmbeddingError
 
 router = APIRouter()
@@ -166,8 +173,24 @@ async def supabase_incremental_webhook(
     Solo procesa type=INSERT; UPDATE/DELETE se ignoran con 200.
     """
     if settings.SUPABASE_WEBHOOK_SECRET:
-        secret = x_webhook_secret or request.headers.get("authorization", "")
-        if secret != settings.SUPABASE_WEBHOOK_SECRET:
+        auth_header = request.headers.get("authorization", "")
+        provided = x_webhook_secret or auth_header
+        expected = settings.SUPABASE_WEBHOOK_SECRET.strip()
+        # Supabase suele enviar "Bearer <jwt>"; aceptar header completo o solo el token
+        token_from_header = (
+            auth_header.split(" ", 1)[1].strip()
+            if auth_header.lower().startswith("bearer ")
+            else auth_header.strip()
+        )
+        expected_token = (
+            expected.split(" ", 1)[1].strip()
+            if expected.lower().startswith("bearer ")
+            else expected
+        )
+        if provided not in (expected, expected_token) and token_from_header not in (
+            expected,
+            expected_token,
+        ):
             raise HTTPException(status_code=401, detail="Webhook no autorizado")
 
     if payload.type != "INSERT":
@@ -178,11 +201,24 @@ async def supabase_incremental_webhook(
             table=payload.table,
         )
 
+    logger.info(
+        f"Webhook Supabase recibido | type={payload.type} "
+        f"schema={payload.schema_} table={payload.table}"
+    )
+
+    if payload.schema_ != settings.SUPABASE_SCHEMA:
+        return SupabaseWebhookResponse(
+            success=True,
+            skipped=True,
+            message=f"Schema '{payload.schema_}' ignorado (esperado: {settings.SUPABASE_SCHEMA})",
+            table=payload.table,
+        )
+
     service = IncrementalIngestService()
     try:
         result = await service.ingest_record(
             table=payload.table,
-            record=payload.record,
+            record=payload.record_dict(),
         )
     except IncrementalIngestError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -211,6 +247,70 @@ async def supabase_incremental_webhook(
         supabase_id=result.get("supabase_id"),
         table=result.get("table"),
     )
+
+
+@router.get("/sync/supabase/tables", tags=["Ingesta"])
+async def list_supabase_tables_endpoint(schema: str | None = None):
+    """Lista tablas del schema (default: SUPABASE_SCHEMA / public)."""
+    try:
+        tables = await list_supabase_tables(schema)
+        profile = schema or settings.SUPABASE_SCHEMA
+        return {"success": True, "schema": profile, "tables": tables}
+    except SupabaseSyncError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post(
+    "/sync/supabase",
+    response_model=SupabaseSyncResponse,
+    tags=["Ingesta"],
+)
+async def sync_supabase_to_qdrant(
+    request: SupabaseSyncRequest | None = None,
+) -> SupabaseSyncResponse:
+    """
+    Fallback: lee TODAS las filas de Supabase e indexa en Qdrant.
+    Usalo si insertaste en Supabase pero el webhook no alcanzo tu API (ej. localhost).
+    Flujo: insert en Supabase -> POST /sync/supabase -> POST /query
+    """
+    table = request.table if request else None
+    schema = request.schema_name if request else None
+    try:
+        result = await sync_table_to_qdrant(table, schema)
+    except SupabaseSyncError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Sync Supabase fallo: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return SupabaseSyncResponse(
+        success=True,
+        schema=result["schema"],
+        table=result["table"],
+        total_rows=result["total_rows"],
+        indexed=result["indexed"],
+        skipped=result["skipped"],
+        errors=result["errors"],
+    )
+
+
+@router.post("/sync/supabase/purge-legacy", tags=["Ingesta"])
+async def purge_legacy_supabase_index():
+    """
+    Borra indexaciones viejas (ej. productos) que contaminan /query.
+    Luego ejecuta POST /sync/supabase para reindexar documentos_tecnicos.
+    """
+    try:
+        qdrant_manager.delete_by_payload_match("supabase_table", "productos")
+        qdrant_manager.delete_by_payload_match("filename", "supabase:productos")
+        info = qdrant_manager.get_collection_info()
+        return {
+            "success": True,
+            "message": "Index legacy productos eliminada",
+            "collection": info,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 # ─── INFO DE COLECCIÓN ────────────────────────────────────────────────────────

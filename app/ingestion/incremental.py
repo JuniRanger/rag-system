@@ -9,6 +9,10 @@ from app.core.config import settings
 from app.core.logger import logger
 from app.embeddings.model import get_embedder
 from app.embeddings.ollama_embedder import OllamaEmbedder, OllamaEmbeddingError
+from app.ingestion.documento_tecnico import (
+    documento_tecnico_metadata,
+    documento_tecnico_to_text,
+)
 from app.vectorstore.qdrant_client import get_qdrant_manager
 
 
@@ -28,22 +32,36 @@ def _qdrant_point_id(record_id: Any) -> str | int:
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, raw))
 
 
-def extract_record_fields(record: dict[str, Any]) -> tuple[str | int, str]:
-    """ID y texto desde record segun campos configurados en .env."""
-    if settings.SUPABASE_RECORD_ID_FIELD not in record:
-        raise IncrementalIngestError(
-            f"Falta campo id '{settings.SUPABASE_RECORD_ID_FIELD}' en record"
-        )
+def extract_record_fields(
+    record: dict[str, Any],
+    *,
+    table: str | None = None,
+) -> tuple[str | int, str]:
+    """ID y texto desde record segun tabla/schema configurados."""
+    id_field = settings.SUPABASE_RECORD_ID_FIELD
+    if id_field not in record:
+        raise IncrementalIngestError(f"Falta campo id '{id_field}' en record")
 
-    record_id = record[settings.SUPABASE_RECORD_ID_FIELD]
-    text: str | None = None
+    record_id = record[id_field]
+    target_table = (table or settings.SUPABASE_SYNC_TABLE or "").strip()
+
+    # Tabla principal RAG: texto estructurado marca/modelo/problema/diagnostico/...
+    if target_table == "documentos_tecnicos":
+        text = documento_tecnico_to_text(record)
+        if not text.strip():
+            raise IncrementalIngestError(
+                "documentos_tecnicos sin campos de texto indexables"
+            )
+        return record_id, text
+
+    parts: list[str] = []
     for field in settings.supabase_text_field_candidates():
         if field in record and record[field] is not None:
             candidate = str(record[field]).strip()
-            if candidate:
-                text = candidate
-                break
+            if candidate and candidate not in parts:
+                parts.append(candidate)
 
+    text = ". ".join(parts) if parts else None
     if not text:
         raise IncrementalIngestError(
             f"Sin texto en record (campos probados: {settings.supabase_text_field_candidates()})"
@@ -81,7 +99,7 @@ class IncrementalIngestService:
                 "reason": f"tabla '{table}' no permitida",
             }
 
-        record_id, text = extract_record_fields(record)
+        record_id, text = extract_record_fields(record, table=table)
         point_id = _qdrant_point_id(record_id)
 
         try:
@@ -89,11 +107,10 @@ class IncrementalIngestService:
         except OllamaEmbeddingError as exc:
             raise IncrementalIngestError(str(exc)) from exc
 
-        # Coleccion lista + upsert de un solo punto
         self.qdrant.create_collection(recreate=False)
         payload = {
             "text": text,
-            "filename": f"supabase:{table}",
+            "filename": f"supabase:{settings.SUPABASE_SCHEMA}:{table}",
             "file_path": "",
             "file_type": ".supabase",
             "chunk_index": 0,
@@ -101,7 +118,10 @@ class IncrementalIngestService:
             "source": "supabase",
             "supabase_id": str(record_id),
             "supabase_table": table,
+            "supabase_schema": settings.SUPABASE_SCHEMA,
         }
+        if table == "documentos_tecnicos":
+            payload.update(documento_tecnico_metadata(record))
         point = PointStruct(id=point_id, vector=vector, payload=payload)
         self.qdrant.upsert_points([point])
 
