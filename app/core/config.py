@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "RAG System"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    PROVIDER_TYPE: str = "LOCAL"
 
     # --- Ollama (tu LLM local) ---
     OLLAMA_BASE_URL: str = "http://localhost:11434"
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     # --- Embeddings (cómo convertimos texto a números) ---
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     EMBEDDING_DIMENSION: int = 384
+    EMBEDDING_BATCH_SIZE: int = 32
 
     # --- Chunking (cómo dividimos los documentos) ---
     CHUNK_SIZE: int = 500
@@ -27,6 +29,16 @@ class Settings(BaseSettings):
 
     # --- Retrieval (cuántos fragmentos recuperamos) ---
     TOP_K: int = 10
+
+    # --- Supabase (ingesta desde tabla) — valores en .env ---
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_TABLE: str = ""
+    SUPABASE_ID_COLUMN: str = "id"
+    SUPABASE_CURSOR_COLUMN: str = "id"
+    SUPABASE_TEXT_COLUMNS: str = ""
+    SUPABASE_WEBHOOK_SECRET: str = ""
+    SUPABASE_SYNC_SECRET: str = ""
 
     # --- Rutas de datos ---
     RAW_DATA_PATH: str = "data/raw"

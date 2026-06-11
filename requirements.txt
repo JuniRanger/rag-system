@@ -15,6 +15,9 @@ ollama==0.3.3
 pypdf==4.3.1
 python-docx==1.1.2
 
+# Ingestión desde fuentes externas
+supabase==2.10.0
+
 # Utilidades
 python-dotenv==1.0.1
 pydantic==2.9.2
@@ -25,3 +28,9 @@ httpx==0.27.2
 # Evaluación RAG
 ragas==0.1.21
 datasets==3.0.1
+
+# Tests
+pytest==8.3.4
+
+# Notebooks (experiments.ipynb)
+pandas==2.2.3

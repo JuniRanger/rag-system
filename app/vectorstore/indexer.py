@@ -1,36 +1,52 @@
-from app.vectorstore.qdrant_client import get_qdrant_manager
-from app.embeddings.model import get_embedder
+from app.core.chunks import prepare_chunks_for_indexing
 from app.core.logger import logger
+from app.core.providers import get_embedding_provider, get_vector_store_provider
+from app.embeddings.base import BaseEmbeddingProvider
+from app.vectorstore.base import BaseVectorStoreProvider
+
 
 class VectorIndexer:
-    def __init__(self):
-        self.qdrant = get_qdrant_manager()
-        self.embedder = get_embedder()
+    """
+    Orquesta la vectorización de chunks ya fragmentados.
+    Responsabilidad: chunks normalizados → embeddings → vectorstore.
+    """
 
-    def index_chunks(self, chunks: list[dict], recreate: bool = False):
+    def __init__(
+        self,
+        embedding_provider: BaseEmbeddingProvider | None = None,
+        vector_store_provider: BaseVectorStoreProvider | None = None,
+    ):
+        self.vector_store = vector_store_provider or get_vector_store_provider()
+        self.embedder = embedding_provider or get_embedding_provider()
+
+    def index_chunks(self, chunks: list[dict], recreate: bool = False) -> dict:
         """
-        Pipeline completo de indexación:
-        chunks de texto → embeddings → Qdrant
+        Pipeline de indexación:
+        chunks de ingesta → embeddings → almacén vectorial
         """
+        if not chunks:
+            raise ValueError("No hay chunks para indexar.")
+
         logger.info(f"Iniciando indexación de {len(chunks)} chunks")
+        prepared_chunks = prepare_chunks_for_indexing(chunks)
+        vector_size = self.embedder.embedding_dimension
 
-        # Paso 1: Crear colección en Qdrant
-        self.qdrant.create_collection(recreate=recreate)
+        try:
+            self.vector_store.create_collection(recreate=recreate, vector_size=vector_size)
+            logger.info(f"Generando embeddings con dimensión={vector_size}...")
+            chunks_with_embeddings = self.embedder.embed_chunks(prepared_chunks)
+            logger.info("Insertando puntos en el almacén vectorial...")
+            inserted = self.vector_store.insert_points(chunks_with_embeddings)
+            info = self.vector_store.get_collection_info()
+        except Exception as exc:
+            logger.error(f"Error durante la indexación: {exc}")
+            raise
 
-        # Paso 2: Generar embeddings para todos los chunks
-        logger.info("Generando embeddings...")
-        chunks_with_embeddings = self.embedder.embed_chunks(chunks)
-
-        # Paso 3: Insertar en Qdrant
-        logger.info("Insertando en Qdrant...")
-        self.qdrant.insert_points(chunks_with_embeddings)
-
-        # Paso 4: Verificar que todo quedó bien
-        info = self.qdrant.get_collection_info()
-        logger.info(f"Indexación completa — Colección: {info}")
-
+        logger.info(
+            f"Indexación completa — puntos insertados={inserted} | colección={info}"
+        )
         return info
 
     def get_index_stats(self) -> dict:
         """Retorna estadísticas del índice actual."""
-        return self.qdrant.get_collection_info()
+        return self.vector_store.get_collection_info()

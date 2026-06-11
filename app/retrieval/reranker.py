@@ -1,13 +1,13 @@
 import json
-import ollama
 from app.core.config import settings
 from app.core.prompts import RERANK_PROMPT
 from app.core.logger import logger
+from app.llm.base import BaseLLMProvider
 
 class Reranker:
-    def __init__(self):
-        # Leemos el modelo configurado en tu archivo .env (qwen2.5:3b)
-        self.model = settings.OLLAMA_MODEL
+    def __init__(self, llm_provider: BaseLLMProvider):
+        self.llm_provider = llm_provider
+        self.model = getattr(llm_provider, "model", llm_provider.__class__.__name__)
         logger.info(f"Reranker inicializado dinámicamente con el modelo: {self.model}")
 
     def rerank(self, query: str, chunks: list[dict]) -> list[dict]:
@@ -33,18 +33,14 @@ class Reranker:
         prompt = RERANK_PROMPT.format(question=query, chunks=chunks_input)
 
         try:
-            # 3. Una única llamada a Ollama para evaluar todo el grupo de golpe
-            response = ollama.chat(
-                model=self.model,
+            # 3. Una única llamada al proveedor LLM para evaluar todo el grupo de golpe
+            output_text = self.llm_provider.generate_response(
                 messages=[{"role": "user", "content": prompt}],
                 options={
                     "temperature": 0.0,
                     "num_predict": 60
                 },
-                keep_alive=settings.OLLAMA_KEEP_ALIVE,
-            )
-            
-            output_text = response["message"]["content"].strip()
+            ).strip()
             
             # Limpiar la respuesta por si Qwen llega a meter la respuesta dentro de bloques markdown ```json ... ```
             if "```" in output_text:

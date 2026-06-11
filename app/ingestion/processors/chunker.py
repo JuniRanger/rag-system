@@ -1,4 +1,5 @@
 from app.core.config import settings
+from app.core.documents import stable_chunk_id
 from app.core.logger import logger
 
 class TextChunker:
@@ -6,8 +7,9 @@ class TextChunker:
         self.chunk_size = settings.CHUNK_SIZE
         self.chunk_overlap = settings.CHUNK_OVERLAP
 
-    def chunk(self, text: str, metadata: dict = {}) -> list[dict]:
+    def chunk(self, text: str, metadata: dict | None = None) -> list[dict]:
         """Divide el texto en fragmentos con solapamiento."""
+        metadata = metadata or {}
         chunks = []
         start = 0
         chunk_index = 0
@@ -22,18 +24,25 @@ class TextChunker:
             chunk_text = text[start:end].strip()
 
             if chunk_text:
-                chunks.append({
+                chunk = {
                     "text": chunk_text,
-                    "chunk_index": chunk_index,
-                    "start_char": start,
-                    "end_char": end,
-                    "char_count": len(chunk_text),
-                    **metadata  # filename, file_path, file_type vienen del loader
-                })
+                    "metadata": {
+                        **metadata,
+                        "chunk_index": chunk_index,
+                        "start_char": start,
+                        "end_char": end,
+                        "char_count": len(chunk_text),
+                    },
+                }
+                chunk["metadata"]["chunk_id"] = stable_chunk_id(chunk)
+                chunks.append(chunk)
                 chunk_index += 1
 
             # El siguiente fragmento empieza con solapamiento
-            start = end - self.chunk_overlap
+            next_start = end - self.chunk_overlap
+            if next_start <= start:
+                next_start = end
+            start = next_start
 
         logger.info(f"Documento dividido en {len(chunks)} fragmentos")
         return chunks

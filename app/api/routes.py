@@ -1,25 +1,29 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from app.api.schemas import (
     QueryRequest, QueryResponse,
     IngestRequest, IngestResponse,
     EvaluateRequest, EvaluateResponse,
-    HealthResponse
+    HealthResponse,
+    SupabaseSyncRequest,
+    SupabaseSyncResponse,
+    SupabaseWebhookPayload,
+    SupabaseWebhookResponse,
 )
-from app.rag.pipeline import RAGPipeline
+from app.api.supabase_auth import verify_sync_secret, verify_webhook_secret
 from app.ingestion.pipeline import IngestionPipeline
+from app.ingestion.supabase_sync import SupabaseSyncService
 from app.vectorstore.indexer import VectorIndexer
 from app.evaluation.evaluator import RAGEvaluator
-from app.llm.client import OllamaClient
-from app.vectorstore.qdrant_client import get_qdrant_manager
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.providers import (
+    create_rag_pipeline,
+    get_embedding_provider,
+    get_llm_provider,
+    get_vector_store_provider,
+)
 
 router = APIRouter()
-
-# Instancias compartidas — se crean una vez al arrancar el servidor
-rag_pipeline = RAGPipeline()
-ollama_client = OllamaClient()
-qdrant_manager = get_qdrant_manager()
 
 
 # ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
@@ -30,18 +34,20 @@ async def health_check():
     Verifica que todos los servicios están funcionando.
     Útil para saber si el sistema está listo antes de usarlo.
     """
-    ollama_ok = ollama_client.is_available()
+    llm_provider = get_llm_provider()
+    vector_store_provider = get_vector_store_provider()
+    llm_ok = llm_provider.is_available()
 
     try:
-        qdrant_manager.get_collection_info()
-        qdrant_ok = True
+        vector_store_provider.get_collection_info()
+        vector_store_ok = True
     except Exception:
-        qdrant_ok = False
+        vector_store_ok = False
 
     return HealthResponse(
-        status="ok" if (ollama_ok and qdrant_ok) else "degraded",
-        ollama_available=ollama_ok,
-        qdrant_available=qdrant_ok,
+        status="ok" if (llm_ok and vector_store_ok) else "degraded",
+        ollama_available=llm_ok,
+        qdrant_available=vector_store_ok,
         model=settings.OLLAMA_MODEL,
         collection=settings.QDRANT_COLLECTION_NAME
     )
@@ -68,8 +74,11 @@ async def ingest_documents(request: IngestRequest):
                 detail="No se encontraron documentos o el texto estaba vacío."
             )
 
-        # Paso 2: Indexar en Qdrant
-        indexer = VectorIndexer()
+        # Paso 2: Indexar en el almacén vectorial configurado
+        indexer = VectorIndexer(
+            embedding_provider=get_embedding_provider(),
+            vector_store_provider=get_vector_store_provider(),
+        )
         collection_info = indexer.index_chunks(
             chunks,
             recreate=request.recreate_collection
@@ -89,6 +98,69 @@ async def ingest_documents(request: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
+
+@router.post(
+    "/sync",
+    response_model=SupabaseSyncResponse,
+    tags=["Supabase"],
+    dependencies=[Depends(verify_sync_secret)],
+)
+async def sync_supabase(request: SupabaseSyncRequest):
+    """
+    Sincronización manual desde Supabase.
+
+    - `incremental`: solo registros nuevos desde el último cursor guardado
+    - `full`: toda la tabla configurada
+    """
+    logger.info(f"Request de sync Supabase | mode={request.mode} | table={request.table}")
+
+    try:
+        service = SupabaseSyncService()
+        result = service.sync(
+            table=request.table,
+            mode=request.mode,
+            recreate_collection=request.recreate_collection,
+        )
+        return SupabaseSyncResponse(**result)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error en sync Supabase: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/webhooks/supabase",
+    response_model=SupabaseWebhookResponse,
+    tags=["Supabase"],
+    dependencies=[Depends(verify_webhook_secret)],
+)
+async def supabase_webhook(payload: SupabaseWebhookPayload):
+    """
+    Webhook para ingerir automáticamente cada INSERT de Supabase.
+
+    Configura en Supabase Dashboard → Database → Webhooks:
+    - Event: INSERT
+    - Table: tu tabla
+    - URL: https://TU_API/api/v1/webhooks/supabase
+    - Header: X-Webhook-Secret = SUPABASE_WEBHOOK_SECRET
+    """
+    logger.info(f"Webhook Supabase recibido | type={payload.type} | table={payload.table}")
+
+    try:
+        service = SupabaseSyncService()
+        result = service.ingest_webhook_record(payload.model_dump())
+        return SupabaseWebhookResponse(**result)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error en webhook Supabase: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── CONSULTA RAG ─────────────────────────────────────────────────────────────
 
 @router.post("/query", response_model=QueryResponse, tags=["RAG"])
@@ -101,8 +173,7 @@ async def query_rag(request: QueryRequest):
 
     try:
         # Crear pipeline con configuración del request
-        pipeline = RAGPipeline()
-        pipeline.chain.use_reranker = request.use_reranker
+        pipeline = create_rag_pipeline(use_reranker=request.use_reranker)
 
         result = pipeline.query(request.question)
 
@@ -149,9 +220,10 @@ async def evaluate_system(request: EvaluateRequest):
 
 @router.get("/collection/info", tags=["Sistema"])
 async def collection_info():
-    """Retorna estadísticas de la colección vectorial en Qdrant."""
+    """Retorna estadísticas de la colección vectorial configurada."""
     try:
-        info = qdrant_manager.get_collection_info()
+        vector_store_provider = get_vector_store_provider()
+        info = vector_store_provider.get_collection_info()
         return {"success": True, "collection": info}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

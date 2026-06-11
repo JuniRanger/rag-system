@@ -1,11 +1,25 @@
 from app.rag.chain import RAGChain
 from app.core.logger import logger
+from app.embeddings.base import BaseEmbeddingProvider
+from app.llm.base import BaseLLMProvider
+from app.vectorstore.base import BaseVectorStoreProvider
 
 class RAGPipeline:
-    def __init__(self):
+    def __init__(
+        self,
+        embedding_provider: BaseEmbeddingProvider,
+        vector_store_provider: BaseVectorStoreProvider,
+        llm_provider: BaseLLMProvider,
+        use_reranker: bool = True,
+    ):
         # use_reranker=True para máxima calidad
         # Cambia a False si necesitas más velocidad
-        self.chain = RAGChain(use_reranker=True)
+        self.chain = RAGChain(
+            embedding_provider=embedding_provider,
+            vector_store_provider=vector_store_provider,
+            llm_provider=llm_provider,
+            use_reranker=use_reranker,
+        )
         logger.info("RAG Pipeline inicializado")
 
     def query(self, question: str) -> dict:
@@ -29,6 +43,7 @@ class RAGPipeline:
                 "metadata": {
                     "chunks_retrieved": result["chunks_retrieved"],
                     "chunks_used": result["chunks_used"],
+                    "tools_used": result.get("tools_used", []),
                 },
             }
         except Exception as e:

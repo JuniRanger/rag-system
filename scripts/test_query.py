@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.rag.pipeline import RAGPipeline
+from app.core.providers import create_rag_pipeline
 from app.core.logger import logger
 
 
@@ -37,10 +37,7 @@ def print_result(result: dict):
 def run_single_query(query: str, use_reranker: bool = True):
     """Corre una sola consulta y muestra el resultado."""
     logger.info(f"Ejecutando consulta: '{query}'")
-    pipeline = RAGPipeline()
-
-    # Configurar reranker según argumento
-    pipeline.chain.use_reranker = use_reranker
+    pipeline = create_rag_pipeline(use_reranker=use_reranker)
 
     result = pipeline.query(query)
     print_result(result)
@@ -49,8 +46,7 @@ def run_single_query(query: str, use_reranker: bool = True):
 def run_interactive(use_reranker: bool = True):
     """Modo interactivo — escribe preguntas en loop hasta escribir 'salir'."""
     print("\n🤖 Sistema RAG activo — escribe 'salir' para terminar\n")
-    pipeline = RAGPipeline()
-    pipeline.chain.use_reranker = use_reranker
+    pipeline = create_rag_pipeline(use_reranker=use_reranker)
 
     while True:
         try:

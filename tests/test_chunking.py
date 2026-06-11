@@ -1,5 +1,5 @@
 import pytest
-from app.ingestion.chunker import Chunker  # Ajusta según tu archivo real
+from app.ingestion.processors.chunker import TextChunker
 
 def test_chunking_integrity():
     """
@@ -11,8 +11,10 @@ def test_chunking_integrity():
         "Si la configuración de la base de datos vectorial es volátil la calificación se considera insuficiente."
     )
     
-    chunker = Chunker(max_chars=120, overlap=20)
-    chunks = chunker.split_text(text_sample)
+    chunker = TextChunker()
+    chunker.chunk_size = 120
+    chunker.chunk_overlap = 20
+    chunks = chunker.chunk(text_sample)
     
     assert isinstance(chunks, list)
     assert len(chunks) > 1
@@ -22,3 +24,9 @@ def test_chunking_integrity():
     assert "latencia" in full_text
     assert "p95" in full_text
     assert "volátil" in full_text
+
+    for chunk in chunks:
+        assert "text" in chunk
+        assert isinstance(chunk["metadata"], dict)
+        assert "chunk_index" in chunk["metadata"]
+        assert chunk["metadata"]["chunk_id"]

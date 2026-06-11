@@ -19,6 +19,27 @@ PREGUNTA:
 RESPUESTA:
 """
 
+TOOL_AUGMENTED_RAG_PROMPT = """
+Eres un asistente experto en diagnóstico y reparación vehicular.
+
+INSTRUCCIONES:
+1. Usa el CONTEXTO recuperado por búsqueda semántica como fuente principal.
+2. Si necesitas filtros exactos (marca, modelo, categoría, severidad, ID, códigos ECU, conteos),
+   invoca las herramientas disponibles antes de responder.
+3. Combina resultados de herramientas y contexto semántico en una respuesta clara.
+4. No inventes datos que no estén en el contexto ni en las herramientas.
+5. Si no hay información suficiente, dilo explícitamente.
+6. Responde en el mismo idioma de la pregunta.
+
+CONTEXTO (búsqueda semántica):
+{context}
+
+PREGUNTA:
+{question}
+
+RESPUESTA:
+"""
+
 # El nuevo prompt adaptado para procesamiento en lote (Batch) con inyección dinámica
 RERANK_PROMPT = """Actúa como un clasificador y reordenador semántico de alta precisión.
 Tu tarea es analizar la relevancia de una serie de fragmentos de texto (chunks) respecto a una pregunta específica, y ordenarlos de mayor a menor importancia.

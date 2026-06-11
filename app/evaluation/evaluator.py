@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 from app.evaluation.metrics import MetricsCalculator, RAGMetrics
 from app.evaluation.dataset import EvalDataset
-from app.rag.pipeline import RAGPipeline
+from app.core.providers import create_rag_pipeline
 from app.core.logger import logger
 
 class RAGEvaluator:
     def __init__(self):
-        self.pipeline = RAGPipeline()
+        self.pipeline = create_rag_pipeline()
         self.calculator = MetricsCalculator()
         self.dataset = EvalDataset()
 

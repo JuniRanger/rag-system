@@ -1,14 +1,26 @@
 from app.retrieval.search import VectorSearch
 from app.retrieval.reranker import Reranker
 from app.llm.generator import ResponseGenerator
-from app.core.config import settings
+from app.core.documents import source_label
 from app.core.logger import logger
+from app.embeddings.base import BaseEmbeddingProvider
+from app.llm.base import BaseLLMProvider
+from app.vectorstore.base import BaseVectorStoreProvider
 
 class RAGChain:
-    def __init__(self, use_reranker: bool = True):
-        self.searcher = VectorSearch()
-        self.reranker = Reranker() if use_reranker else None
-        self.generator = ResponseGenerator()
+    def __init__(
+        self,
+        embedding_provider: BaseEmbeddingProvider,
+        vector_store_provider: BaseVectorStoreProvider,
+        llm_provider: BaseLLMProvider,
+        use_reranker: bool = True,
+    ):
+        self.searcher = VectorSearch(
+            embedding_provider=embedding_provider,
+            vector_store_provider=vector_store_provider,
+        )
+        self.reranker = Reranker(llm_provider=llm_provider) if use_reranker else None
+        self.generator = ResponseGenerator(llm_provider=llm_provider)
         self.use_reranker = use_reranker
 
     def run(self, query: str) -> dict:
@@ -51,7 +63,7 @@ class RAGChain:
         result = self.generator.generate(query, chunks)
 
         # Paso 4: Construir respuesta final con metadatos
-        sources = list(set([c.get("filename", "") for c in chunks]))
+        sources = sorted({source_label(chunk) for chunk in chunks})
 
         response = {
             "query": query,
@@ -59,7 +71,8 @@ class RAGChain:
             "sources": sources,
             "chunks_retrieved": chunks_retrieved,
             "chunks_used": chunks_used,
-            "context_used": result["context_used"]
+            "context_used": result["context_used"],
+            "tools_used": result.get("tools_used", []),
         }
 
         logger.info(f"=== RAG Chain completada | fuentes: {sources} ===")
