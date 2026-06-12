@@ -1,3 +1,4 @@
+import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -121,6 +122,36 @@ class FakeSupabaseClient:
         return FakeQuery(self._rows)
 
 
+class MockLLMProvider:
+    def __init__(self):
+        self.calls = 0
+
+    def chat_with_tools(self, messages, tools, options=None):
+        self.calls += 1
+        if self.calls == 1:
+            return {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "buscar_por_vehiculo",
+                            "arguments": {
+                                "marca": "Hyundai",
+                                "modelo": "Santa Fe",
+                            },
+                        }
+                    }
+                ],
+            }
+        return {
+            "role": "assistant",
+            "content": "Hay un reporte de batería descargada para ese vehículo.",
+        }
+
+    async def chat_with_tools_async(self, messages, tools, options=None):
+        return self.chat_with_tools(messages, tools, options)
+
+
 @pytest.fixture(autouse=True)
 def reset_tool_registry():
     tool_registry._tools.clear()
@@ -178,36 +209,12 @@ def test_parse_tool_arguments_accepts_dict_and_json_string():
 
 
 def test_run_tool_augmented_generation_executes_tool_and_returns_answer(registered_tools):
-    class MockLLMProvider:
-        def __init__(self):
-            self.calls = 0
-
-        def chat_with_tools(self, messages, tools, options=None):
-            self.calls += 1
-            if self.calls == 1:
-                return {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "function": {
-                                "name": "buscar_por_vehiculo",
-                                "arguments": {
-                                    "marca": "Hyundai",
-                                    "modelo": "Santa Fe",
-                                },
-                            }
-                        }
-                    ],
-                }
-            return {
-                "role": "assistant",
-                "content": "Hay un reporte de batería descargada para ese vehículo.",
-            }
-
-    result = run_tool_augmented_generation(
-        llm_provider=MockLLMProvider(),
-        query="¿Hay reportes para un Hyundai Santa Fe 2016?",
-        context_text="[Fragmento 1] Contexto semántico de prueba.",
+    result = asyncio.run(
+        run_tool_augmented_generation(
+            llm_provider=MockLLMProvider(),
+            query="¿Hay reportes para un Hyundai Santa Fe 2016?",
+            context_text="[Fragmento 1] Contexto semántico de prueba.",
+        )
     )
 
     assert result["tools_used"][0]["tool"] == "buscar_por_vehiculo"
@@ -217,23 +224,25 @@ def test_run_tool_augmented_generation_executes_tool_and_returns_answer(register
 
 @pytest.mark.integration
 def test_ollama_tool_calling_live(registered_tools):
+    payload = {
+        "model": "qwen2.5:3b",
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "¿Hay reportes de fallas para un Hyundai Santa Fe 2016? "
+                    "Usa herramientas si hace falta."
+                ),
+            }
+        ],
+        "tools": tool_registry.get_ollama_schemas(),
+        "stream": False,
+    }
+
     try:
         response = httpx.post(
             "http://localhost:11434/api/chat",
-            json={
-                "model": "qwen2.5:3b",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": (
-                            "¿Hay reportes de fallas para un Hyundai Santa Fe 2016? "
-                            "Usa herramientas si hace falta."
-                        ),
-                    }
-                ],
-                "tools": tool_registry.get_ollama_schemas(),
-                "stream": False,
-            },
+            json=payload,
             timeout=60.0,
         )
         response.raise_for_status()
@@ -249,6 +258,7 @@ def test_ollama_tool_calling_live(registered_tools):
     call = tool_calls[0]
     tool_name = call["function"]["name"]
     arguments = call["function"].get("arguments", {})
+
     if isinstance(arguments, str):
         arguments = json.loads(arguments)
 

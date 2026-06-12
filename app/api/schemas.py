@@ -1,28 +1,9 @@
 from pydantic import BaseModel, Field
 from typing import Any, Literal, Optional
 
+# Schemas RAG: app.rag.schemas (RAGRequest, RAGResponse, etc.)
+
 # ─── REQUEST SCHEMAS (lo que recibe la API) ───────────────────────────────────
-
-class QueryRequest(BaseModel):
-    """Esquema para consultas al sistema RAG."""
-    question: str = Field(
-        ...,
-        min_length=3,
-        max_length=1000,
-        description="Pregunta del usuario"
-    )
-    use_reranker: bool = Field(
-        default=True,
-        description="Si usar reranking para mejorar precisión"
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "question": "¿Qué es una base de datos vectorial?",
-                "use_reranker": True
-            }
-        }
 
 class IngestRequest(BaseModel):
     """Esquema para ingestar documentos."""
@@ -83,14 +64,6 @@ class SupabaseWebhookPayload(BaseModel):
     old_record: Optional[dict[str, Any]] = None
 
 # ─── RESPONSE SCHEMAS (lo que retorna la API) ─────────────────────────────────
-
-class QueryResponse(BaseModel):
-    """Respuesta de una consulta RAG."""
-    success: bool
-    query: str
-    answer: str
-    sources: list[str]
-    metadata: dict
 
 class IngestResponse(BaseModel):
     """Respuesta de una ingesta de documentos."""

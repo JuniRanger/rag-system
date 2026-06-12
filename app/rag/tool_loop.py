@@ -1,9 +1,11 @@
+import asyncio
 import json
 from typing import Any
 
 from app.core.logger import logger
 from app.core.prompts import TOOL_AUGMENTED_RAG_PROMPT
 from app.llm.base import BaseLLMProvider
+from app.rag.mappers import estimate_tokens
 from app.tools.executor import tool_executor
 from app.tools.registry import tool_registry
 
@@ -18,7 +20,7 @@ def _parse_tool_arguments(raw: Any) -> dict:
     return {}
 
 
-def run_tool_augmented_generation(
+async def run_tool_augmented_generation(
     llm_provider: BaseLLMProvider,
     query: str,
     context_text: str,
@@ -34,14 +36,18 @@ def run_tool_augmented_generation(
     prompt = TOOL_AUGMENTED_RAG_PROMPT.format(context=context_text, question=query)
     messages: list[dict] = [{"role": "user", "content": prompt}]
     tools_used: list[dict] = []
+    tokens_input = estimate_tokens(prompt)
+    tokens_output = 0
 
     answer = ""
+    message: dict = {}
     for round_index in range(MAX_TOOL_ROUNDS):
-        message = llm_provider.chat_with_tools(messages=messages, tools=tools)
+        message = await llm_provider.chat_with_tools_async(messages=messages, tools=tools)
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
             answer = (message.get("content") or "").strip()
+            tokens_output += estimate_tokens(answer)
             break
 
         messages.append(message)
@@ -51,14 +57,17 @@ def run_tool_augmented_generation(
             function = tool_call.get("function") or {}
             tool_name = function.get("name", "")
             arguments = _parse_tool_arguments(function.get("arguments"))
-            result = tool_executor.execute(tool_name, arguments)
+            result = await asyncio.to_thread(tool_executor.execute, tool_name, arguments)
             tools_used.append(
                 {
                     "tool": tool_name,
                     "arguments": arguments,
                     "status": result.get("status"),
+                    "output": result.get("output"),
                 }
             )
+            tokens_input += estimate_tokens(json.dumps(arguments, ensure_ascii=False))
+            tokens_output += estimate_tokens(str(result.get("output", "")))
             messages.append(
                 {
                     "role": "tool",
@@ -73,4 +82,6 @@ def run_tool_augmented_generation(
     return {
         "answer": answer,
         "tools_used": tools_used,
+        "tokens_input": tokens_input,
+        "tokens_output": tokens_output,
     }

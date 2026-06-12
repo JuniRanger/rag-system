@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.schemas import (
-    QueryRequest, QueryResponse,
-    IngestRequest, IngestResponse,
-    EvaluateRequest, EvaluateResponse,
+    IngestRequest,
+    IngestResponse,
+    EvaluateRequest,
+    EvaluateResponse,
     HealthResponse,
     SupabaseSyncRequest,
     SupabaseSyncResponse,
     SupabaseWebhookPayload,
     SupabaseWebhookResponse,
 )
+from app.rag.schemas import RAGRequest, RAGResponse
 from app.api.supabase_auth import verify_sync_secret, verify_webhook_secret
 from app.ingestion.pipeline import IngestionPipeline
 from app.ingestion.supabase_sync import SupabaseSyncService
@@ -163,32 +165,24 @@ async def supabase_webhook(payload: SupabaseWebhookPayload):
 
 # ─── CONSULTA RAG ─────────────────────────────────────────────────────────────
 
-@router.post("/query", response_model=QueryResponse, tags=["RAG"])
-async def query_rag(request: QueryRequest):
+@router.post("/query", response_model=RAGResponse, tags=["RAG"])
+async def query_rag(request: RAGRequest):
     """
-    Consulta el sistema RAG con una pregunta en lenguaje natural.
-    Retorna respuesta basada únicamente en los documentos indexados.
+    Consulta conversacional al sistema RAG.
+    Acepta historial reciente, resumen y opciones de recuperación/generación.
     """
-    logger.info(f"Request de consulta: '{request.question}'")
+    logger.info(
+        f"Request de consulta | conversation_id={request.conversation_id} | "
+        f"message='{request.message.content}'"
+    )
 
     try:
-        # Crear pipeline con configuración del request
-        pipeline = create_rag_pipeline(use_reranker=request.use_reranker)
-
-        result = pipeline.query(request.question)
-
-        return QueryResponse(
-            success=result["success"],
-            query=result["query"],
-            answer=result["answer"],
-            sources=result["sources"],
-            metadata=result["metadata"]
-        )
+        pipeline = create_rag_pipeline(use_reranker=request.options.use_reranker)
+        return await pipeline.run(request)
 
     except Exception as e:
         logger.error(f"Error en consulta RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # ─── EVALUACIÓN ───────────────────────────────────────────────────────────────
 

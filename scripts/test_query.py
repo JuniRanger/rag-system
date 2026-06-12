@@ -20,17 +20,25 @@ from app.core.logger import logger
 def print_result(result: dict):
     """Imprime el resultado de forma legible en terminal."""
     print("\n" + "="*60)
-    print(f"  PREGUNTA: {result['query']}")
+    print(f"  PREGUNTA: {result.get('query', '')}")
     print("="*60)
     print(f"\n  RESPUESTA:\n  {result['answer']}")
     print("\n" + "-"*60)
 
-    if result["sources"]:
-        print(f"  FUENTES: {', '.join(result['sources'])}")
+    sources = result.get("sources", [])
+    if sources:
+        labels = [
+            source.get("label") or source.get("document_id")
+            for source in sources
+        ]
+        print(f"  FUENTES: {', '.join(labels)}")
 
     meta = result.get("metadata", {})
-    print(f"  Chunks recuperados : {meta.get('chunks_retrieved', 0)}")
-    print(f"  Chunks usados      : {meta.get('chunks_used', 0)}")
+    print(f"  Chunks recuperados : {meta.get('retrieved_chunks', meta.get('chunks_retrieved', 0))}")
+    print(f"  Chunks usados      : {meta.get('used_chunks', meta.get('chunks_used', 0))}")
+    print(f"  Latencia (ms)      : {meta.get('latency_ms', 0)}")
+    if meta.get("function_calls"):
+        print(f"  Tools usadas       : {len(meta['function_calls'])}")
     print("="*60 + "\n")
 
 

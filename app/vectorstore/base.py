@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 
 
@@ -16,6 +17,10 @@ class BaseVectorStoreProvider(ABC):
     def search(self, query_vector: list[float], top_k: int = None) -> list[dict]:
         """Busca vectores similares al vector de consulta."""
         raise NotImplementedError
+
+    async def search_async(self, query_vector: list[float], top_k: int = None) -> list[dict]:
+        """Versión asíncrona de búsqueda vectorial."""
+        return await asyncio.to_thread(self.search, query_vector, top_k)
 
     @abstractmethod
     def get_collection_info(self) -> dict:

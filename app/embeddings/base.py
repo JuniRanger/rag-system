@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
@@ -16,6 +17,10 @@ class BaseEmbeddingProvider(ABC):
     def embed_text(self, text: str) -> list[float]:
         """Convierte un texto en un vector de números."""
         raise NotImplementedError
+
+    async def embed_text_async(self, text: str) -> list[float]:
+        """Versión asíncrona de embed_text."""
+        return await asyncio.to_thread(self.embed_text, text)
 
     @abstractmethod
     def embed_batch(self, texts: list[str]) -> list[list[float]]:

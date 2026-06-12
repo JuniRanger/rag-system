@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 50
 
     # --- Retrieval (cuántos fragmentos recuperamos) ---
-    TOP_K: int = 10
+    TOP_K: int = 5
 
     # --- Supabase (ingesta desde tabla) — valores en .env ---
     SUPABASE_URL: str = ""
