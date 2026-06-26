@@ -23,7 +23,7 @@ class ToolRegistry:
     def get_ollama_schemas(self) -> List[Dict[str, Any]]:
         """
         Devuelve el catálogo completo de herramientas con el formato 
-        JSON nativo que Ollama y modelos como Qwen esperan.
+        JSON nativo que Ollama y modelos compatibles esperan.
         """
         return [tool.schema for tool in self._tools.values()]
 

@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
+from app.core.llm_models import DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_MODEL_FALLBACK
+
 class Settings(BaseSettings):
       # --- Aplicación ---
     APP_NAME: str = "RAG System"
@@ -10,7 +12,8 @@ class Settings(BaseSettings):
 
     # --- Ollama (tu LLM local) ---
     OLLAMA_BASE_URL: str = "http://172.17.0.1:11434"
-    OLLAMA_MODEL: str = "llama3.2:1b"
+    OLLAMA_MODEL: str = DEFAULT_OLLAMA_MODEL
+    OLLAMA_MODEL_FALLBACK: str = DEFAULT_OLLAMA_MODEL_FALLBACK
     OLLAMA_KEEP_ALIVE: str = "24h"
 
     # --- Qdrant (tu base de datos vectorial) ---

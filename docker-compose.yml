@@ -22,6 +22,8 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       OLLAMA_BASE_URL: http://172.17.0.1:11434
+      OLLAMA_MODEL: llama3.2:1b
+      OLLAMA_MODEL_FALLBACK: llama3.2:3b
       HF_HOME: /app/.cache/huggingface
       TRANSFORMERS_CACHE: /app/.cache/huggingface
     extra_hosts:

@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from app.llm.ollama_client import get_ollama_base_url
+from app.llm.model_config import get_active_ollama_model
 from app.rag.tool_loop import _parse_tool_arguments, run_tool_augmented_generation
 from app.tools.executor import tool_executor
 from app.tools.implementations.supabase.read_tools import register_read_tools
@@ -226,7 +227,7 @@ def test_run_tool_augmented_generation_executes_tool_and_returns_answer(register
 @pytest.mark.integration
 def test_ollama_tool_calling_live(registered_tools):
     payload = {
-        "model": "llama3.2:1b",
+        "model": get_active_ollama_model(),
         "messages": [
             {
                 "role": "user",

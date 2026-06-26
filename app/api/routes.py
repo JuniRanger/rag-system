@@ -19,6 +19,7 @@ from app.vectorstore.indexer import VectorIndexer
 from app.evaluation.evaluator import RAGEvaluator
 from app.core.config import settings
 from app.core.logger import logger
+from app.llm.model_config import get_active_ollama_model
 from app.core.providers import (
     create_rag_pipeline,
     get_embedding_provider,
@@ -51,7 +52,7 @@ async def health_check():
         status="ok" if (llm_ok and vector_store_ok) else "degraded",
         ollama_available=llm_ok,
         qdrant_available=vector_store_ok,
-        model=settings.OLLAMA_MODEL,
+        model=get_active_ollama_model(),
         collection=settings.QDRANT_COLLECTION_NAME
     )
 

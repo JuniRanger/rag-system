@@ -5,6 +5,7 @@ from app.api.routes import router
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.providers import get_embedding_provider, get_llm_provider, get_vector_store_provider
+from app.llm.model_config import get_active_ollama_model
 from app.tools import register_all_tools
 
 
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning(" Proveedor LLM no disponible — verifica su configuración")
 
-    logger.info(f"Modelo LLM     : {settings.OLLAMA_MODEL}")
+    logger.info(f"Modelo LLM activo: {get_active_ollama_model()}")
     logger.info(f"Embedding model: {settings.EMBEDDING_MODEL_NAME}")
     logger.info(f"Chunk size     : {settings.CHUNK_SIZE} | Overlap: {settings.CHUNK_OVERLAP}")
     logger.info(f"Top-K          : {settings.TOP_K}")
