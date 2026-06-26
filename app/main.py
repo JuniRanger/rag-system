@@ -12,6 +12,7 @@ from app.tools import register_all_tools
 async def lifespan(app: FastAPI):
     # ── Al arrancar: precargar todo en memoria ──
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"OLLAMA_BASE_URL : {settings.OLLAMA_BASE_URL}")
     provider_type = settings.PROVIDER_TYPE.upper()
     logger.info(f"Provider type  : {provider_type}")
 

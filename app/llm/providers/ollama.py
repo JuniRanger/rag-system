@@ -1,10 +1,9 @@
 import asyncio
 
-import ollama
-
 from app.core.config import settings
 from app.core.logger import logger
 from app.llm.base import BaseLLMProvider
+from app.llm.ollama_client import get_ollama_client
 
 _STREAM_END = object()
 
@@ -21,12 +20,13 @@ class OllamaLLMProvider(BaseLLMProvider):
     def __init__(self):
         self.model = settings.OLLAMA_MODEL
         self.base_url = settings.OLLAMA_BASE_URL
+        self._client = get_ollama_client()
         self._verify_connection()
 
     def _verify_connection(self):
         """Verifica que Ollama está corriendo y el modelo está disponible."""
         try:
-            models = ollama.list()
+            models = self._client.list()
             available = [m["name"] for m in models["models"]]
 
             if self.model not in available:
@@ -34,7 +34,7 @@ class OllamaLLMProvider(BaseLLMProvider):
                 logger.warning(f"Ejecuta: ollama pull {self.model}")
             else:
                 logger.info(f"Modelo '{self.model}' verificado — calentando...")
-                ollama.chat(
+                self._client.chat(
                     model=self.model,
                     messages=[{"role": "user", "content": "ok"}],
                     options={"num_predict": 1},
@@ -42,8 +42,8 @@ class OllamaLLMProvider(BaseLLMProvider):
                 )
                 logger.info(f" Modelo '{self.model}' caliente en memoria VRAM")
         except Exception as e:
-            logger.error(f"No se puede conectar a Ollama: {e}")
-            logger.error("Asegúrate de que Ollama está corriendo con: ollama serve")
+            logger.error(f"No se puede conectar a Ollama ({self.base_url}): {e}")
+            logger.error("Asegúrate de que Ollama está corriendo y OLLAMA_BASE_URL es correcto")
 
     def generate_response(
         self,
@@ -56,7 +56,7 @@ class OllamaLLMProvider(BaseLLMProvider):
         messages: lista de dicts con 'role' y 'content'
         """
         try:
-            response = ollama.chat(
+            response = self._client.chat(
                 model=self.model,
                 messages=messages,
                 stream=stream,
@@ -80,7 +80,7 @@ class OllamaLLMProvider(BaseLLMProvider):
         messages: list[dict],
         options: dict = None,
     ):
-        stream = ollama.chat(
+        stream = self._client.chat(
             model=self.model,
             messages=messages,
             stream=True,
@@ -105,7 +105,7 @@ class OllamaLLMProvider(BaseLLMProvider):
         options: dict = None,
     ) -> dict:
         try:
-            response = ollama.chat(
+            response = self._client.chat(
                 model=self.model,
                 messages=messages,
                 tools=tools,
@@ -121,7 +121,7 @@ class OllamaLLMProvider(BaseLLMProvider):
     def is_available(self) -> bool:
         """Verifica si Ollama está disponible en este momento."""
         try:
-            ollama.list()
+            self._client.list()
             return True
         except Exception:
             return False

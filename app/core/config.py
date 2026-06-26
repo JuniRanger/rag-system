@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     PROVIDER_TYPE: str = "LOCAL"
 
     # --- Ollama (tu LLM local) ---
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_BASE_URL: str = "http://host.docker.internal:11434"
     OLLAMA_MODEL: str = "qwen2.5:3b"
     OLLAMA_KEEP_ALIVE: str = "24h"
 

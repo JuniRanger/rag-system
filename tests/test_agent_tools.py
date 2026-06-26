@@ -6,6 +6,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
+from app.llm.ollama_client import get_ollama_base_url
 from app.rag.tool_loop import _parse_tool_arguments, run_tool_augmented_generation
 from app.tools.executor import tool_executor
 from app.tools.implementations.supabase.read_tools import register_read_tools
@@ -239,15 +240,17 @@ def test_ollama_tool_calling_live(registered_tools):
         "stream": False,
     }
 
+    ollama_chat_url = f"{get_ollama_base_url()}/api/chat"
+
     try:
         response = httpx.post(
-            "http://localhost:11434/api/chat",
+            ollama_chat_url,
             json=payload,
             timeout=60.0,
         )
         response.raise_for_status()
     except httpx.ConnectError:
-        pytest.skip("Ollama no está disponible en localhost:11434")
+        pytest.skip(f"Ollama no está disponible en {get_ollama_base_url()}")
 
     message = response.json().get("message", {})
     tool_calls = message.get("tool_calls", [])
