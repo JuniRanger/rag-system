@@ -1,12 +1,7 @@
-from functools import lru_cache
-from app.embeddings.embedder import Embedder
-from app.core.logger import logger
+"""Compatibilidad retroactiva. Usar get_embedding_provider() en código nuevo."""
+from app.core.providers import get_embedding_provider
+from app.embeddings.base import BaseEmbeddingProvider
 
-@lru_cache()
-def get_embedder() -> Embedder:
-    """
-    Retorna siempre la misma instancia del Embedder.
-    lru_cache garantiza que el modelo no se carga dos veces.
-    """
-    logger.info("Inicializando instancia única del Embedder")
-    return Embedder()
+get_embedder = get_embedding_provider
+
+__all__ = ["get_embedder", "BaseEmbeddingProvider"]

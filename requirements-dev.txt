@@ -1,0 +1,16 @@
+-r requirements.txt
+
+# Evaluación RAG (pesado)
+ragas==0.1.21
+datasets==3.0.1
+
+# Data analysis
+pandas==2.2.3
+
+# Testing
+pytest==8.3.4
+
+# HF ecosystem indirect tools (solo dev)
+transformers==4.44.2
+torch==2.3.1+cpu
+--index-url https://download.pytorch.org/whl/cpu

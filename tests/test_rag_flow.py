@@ -1,12 +1,12 @@
 import pytest
-from app.rag.pipeline import RAGPipeline
+from app.core.providers import create_rag_pipeline
 
 def test_rag_flow_and_hallucination_prevention():
     """
     CRITERIO RÚBRICA: El System Prompt debe restringir adecuadamente al LLM
     para que admita ignorancia si el dato no está en la base de datos vectorial.
     """
-    rag_pipeline = RAGPipeline()
+    rag_pipeline = create_rag_pipeline()
     
     # Caso 1: Pregunta dentro del contexto de la rúbrica
     query_ok = "¿Cuál es el límite de latencia en el percentil 95?"

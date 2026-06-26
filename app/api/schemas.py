@@ -1,28 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Any, Literal, Optional
+
+# Schemas RAG: app.rag.schemas (RAGRequest, RAGResponse, etc.)
 
 # ─── REQUEST SCHEMAS (lo que recibe la API) ───────────────────────────────────
-
-class QueryRequest(BaseModel):
-    """Esquema para consultas al sistema RAG."""
-    question: str = Field(
-        ...,
-        min_length=3,
-        max_length=1000,
-        description="Pregunta del usuario"
-    )
-    use_reranker: bool = Field(
-        default=True,
-        description="Si usar reranking para mejorar precisión"
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "question": "¿Qué es una base de datos vectorial?",
-                "use_reranker": True
-            }
-        }
 
 class IngestRequest(BaseModel):
     """Esquema para ingestar documentos."""
@@ -50,15 +31,39 @@ class EvaluateRequest(BaseModel):
         description="Ruta al dataset JSON. Si es null usa el dataset por defecto."
     )
 
-# ─── RESPONSE SCHEMAS (lo que retorna la API) ─────────────────────────────────
+class SupabaseSyncRequest(BaseModel):
+    """Sincronización manual desde una tabla de Supabase."""
+    table: Optional[str] = Field(
+        default=None,
+        description="Tabla a sincronizar. Si es null usa SUPABASE_TABLE del .env"
+    )
+    mode: Literal["full", "incremental"] = Field(
+        default="incremental",
+        description="full: toda la tabla | incremental: solo registros nuevos desde el último cursor"
+    )
+    recreate_collection: bool = Field(
+        default=False,
+        description="Si recrear la colección vectorial desde cero"
+    )
 
-class QueryResponse(BaseModel):
-    """Respuesta de una consulta RAG."""
-    success: bool
-    query: str
-    answer: str
-    sources: list[str]
-    metadata: dict
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "table": None,
+                "mode": "incremental",
+                "recreate_collection": False,
+            }
+        }
+
+class SupabaseWebhookPayload(BaseModel):
+    """Payload enviado por Supabase Database Webhooks."""
+    type: str = Field(..., description="Tipo de evento: INSERT, UPDATE, DELETE")
+    table: str
+    schema: str = "public"
+    record: Optional[dict[str, Any]] = None
+    old_record: Optional[dict[str, Any]] = None
+
+# ─── RESPONSE SCHEMAS (lo que retorna la API) ─────────────────────────────────
 
 class IngestResponse(BaseModel):
     """Respuesta de una ingesta de documentos."""
@@ -81,3 +86,22 @@ class HealthResponse(BaseModel):
     qdrant_available: bool
     model: str
     collection: str
+
+class SupabaseSyncResponse(BaseModel):
+    """Respuesta de sincronización manual con Supabase."""
+    success: bool
+    message: str
+    table: str
+    mode: Optional[str] = None
+    records_processed: int
+    chunks_created: int
+    collection_info: dict
+    sync_state: dict
+
+class SupabaseWebhookResponse(BaseModel):
+    """Respuesta del webhook de Supabase."""
+    success: bool
+    message: str
+    record_id: Optional[Any] = None
+    chunks_created: int = 0
+    collection_info: Optional[dict] = None

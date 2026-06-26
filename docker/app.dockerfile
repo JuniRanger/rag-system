@@ -3,34 +3,37 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Evita archivos innecesarios de Python + optimiza pip
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     HF_HOME=/app/.cache/huggingface \
     TRANSFORMERS_CACHE=/app/.cache/huggingface
 
-# Dependencias del sistema para wheels de ML
+# Dependencias mínimas del sistema (sin overkill)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Dependencias Python
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --no-cache-dir torch==2.3.1
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Precarga del modelo de embeddings (arranque más rápido en runtime)
-RUN python -c "\
-from sentence_transformers import SentenceTransformer; \
-SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
-
+# Código de la aplicación
 COPY app/ ./app/
 COPY scripts/ ./scripts/
 
-RUN mkdir -p data/raw data/chunks data/processed logs
+# Directorios de trabajo
+RUN mkdir -p data/raw data/chunks data/processed logs \
+    && mkdir -p /app/.cache/huggingface
 
+# Exponer API
 EXPOSE 8000
 
+# Healthcheck básico
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Startup
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

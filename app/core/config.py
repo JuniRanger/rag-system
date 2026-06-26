@@ -6,9 +6,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "RAG System"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    PROVIDER_TYPE: str = "LOCAL"
 
     # --- Ollama (tu LLM local) ---
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_BASE_URL: str = "http://host.docker.internal:11434"
     OLLAMA_MODEL: str = "qwen2.5:3b"
     OLLAMA_KEEP_ALIVE: str = "24h"
 
@@ -20,13 +21,27 @@ class Settings(BaseSettings):
     # --- Embeddings (cómo convertimos texto a números) ---
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     EMBEDDING_DIMENSION: int = 384
+    EMBEDDING_BATCH_SIZE: int = 32
 
     # --- Chunking (cómo dividimos los documentos) ---
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
 
     # --- Retrieval (cuántos fragmentos recuperamos) ---
-    TOP_K: int = 10
+    TOP_K: int = 5
+
+    # --- Supabase (ingesta desde tabla) — valores en .env ---
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_TABLE: str = ""
+    SUPABASE_ID_COLUMN: str = "id"
+    SUPABASE_CURSOR_COLUMN: str = "id"
+    SUPABASE_TEXT_COLUMNS: str = ""
+    SUPABASE_WEBHOOK_SECRET: str = ""
+    SUPABASE_SYNC_SECRET: str = ""
+    # Tool calling en generación RAG (independiente de webhook/sync).
+    # False → streaming habilitado; True → /query usa herramientas Supabase, /query/stream no.
+    ENABLE_RAG_TOOLS: bool = False
 
     # --- Rutas de datos ---
     RAW_DATA_PATH: str = "data/raw"

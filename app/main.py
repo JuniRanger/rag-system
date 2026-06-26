@@ -4,37 +4,44 @@ from contextlib import asynccontextmanager
 from app.api.routes import router
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.providers import get_embedding_provider, get_llm_provider, get_vector_store_provider
+from app.tools import register_all_tools
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Al arrancar: precargar todo en memoria ──
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"OLLAMA_BASE_URL : {settings.OLLAMA_BASE_URL}")
+    provider_type = settings.PROVIDER_TYPE.upper()
+    logger.info(f"Provider type  : {provider_type}")
+
+    if provider_type not in {"LOCAL", "AZURE"}:
+        raise ValueError(f"PROVIDER_TYPE no soportado: {settings.PROVIDER_TYPE}")
     
     logger.info("Precargando modelo de embeddings en RAM...")
-    from app.embeddings.model import get_embedder
-    embedder = get_embedder()
+    embedder = get_embedding_provider()
     # Forzar una inferencia dummy para que el modelo quede caliente
     embedder.embed_text("inicialización del sistema")
     logger.info(" Modelo de embeddings listo en RAM")
 
-    logger.info("Verificando conexión a Qdrant...")
-    from app.vectorstore.qdrant_client import get_qdrant_manager
-    qdrant = get_qdrant_manager()
-    logger.info("Qdrant conectado")
+    logger.info("Verificando conexión al almacén vectorial...")
+    get_vector_store_provider()
+    logger.info("Almacén vectorial conectado")
 
-    logger.info("Verificando Ollama...")
-    from app.llm.client import OllamaClient
-    ollama = OllamaClient()
-    if ollama.is_available():
-        logger.info("Ollama disponible")
+    logger.info("Verificando proveedor LLM...")
+    llm = get_llm_provider()
+    if llm.is_available():
+        logger.info("Proveedor LLM disponible")
     else:
-        logger.warning(" Ollama no disponible — verifica que está corriendo")
+        logger.warning(" Proveedor LLM no disponible — verifica su configuración")
 
     logger.info(f"Modelo LLM     : {settings.OLLAMA_MODEL}")
     logger.info(f"Embedding model: {settings.EMBEDDING_MODEL_NAME}")
     logger.info(f"Chunk size     : {settings.CHUNK_SIZE} | Overlap: {settings.CHUNK_OVERLAP}")
     logger.info(f"Top-K          : {settings.TOP_K}")
+
+    register_all_tools()
     logger.info("Sistema listo para recibir requests")
 
     yield
