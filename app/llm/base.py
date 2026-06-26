@@ -1,5 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 
 
 class BaseLLMProvider(ABC):
@@ -26,6 +27,16 @@ class BaseLLMProvider(ABC):
             stream,
             options,
         )
+
+    async def stream_response_async(
+        self,
+        messages: list[dict],
+        options: dict = None,
+    ) -> AsyncIterator[str]:
+        """Emite la respuesta completa como un único token si no hay streaming nativo."""
+        text = await self.generate_response_async(messages, options=options)
+        if text:
+            yield text
 
     def generate(self, prompt: str) -> str:
         """Atajo para llamadas simples con un solo prompt."""

@@ -65,6 +65,7 @@ def test_supabase_loader_build_text_with_selected_columns():
 
     text = loader.build_text({"id": 1, "title": "Hola", "body": "Mundo", "internal": "x"})
 
+    assert "id: 1" in text
     assert "title: Hola" in text
     assert "body: Mundo" in text
     assert "internal" not in text

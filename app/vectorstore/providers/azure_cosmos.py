@@ -1,7 +1,9 @@
 from app.vectorstore.base import BaseVectorStoreProvider
 
-
 class AzureCosmosVectorStoreProvider(BaseVectorStoreProvider):
+    """
+    Implementación futura de Azure Cosmos como vector store.
+    """
     def __init__(self):
         raise NotImplementedError("Azure Cosmos vector store aún no está implementado.")
 

@@ -6,6 +6,7 @@ from app.rag.schemas import (
     RAGResponse,
     RAGResponseMetadata,
     SourceReference,
+    WorkingMemory,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "RAGResponse",
     "RAGResponseMetadata",
     "SourceReference",
+    "WorkingMemory",
 ]

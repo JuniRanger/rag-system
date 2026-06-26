@@ -4,6 +4,7 @@ from app.rag.schemas import (
     RAGResponse,
     RAGResponseMetadata,
     SourceReference,
+    WorkingMemory,
 )
 
 
@@ -52,11 +53,18 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-def error_response(conversation_id: str, message: str) -> RAGResponse:
+def error_response(
+    conversation_id: str,
+    message: str,
+    summary: str = "",
+    working_memory: WorkingMemory | None = None,
+) -> RAGResponse:
     return RAGResponse(
         success=False,
         conversation_id=conversation_id,
         answer=message,
+        summary=summary,
+        working_memory=working_memory or WorkingMemory(),
         sources=[],
         metadata=RAGResponseMetadata(),
     )

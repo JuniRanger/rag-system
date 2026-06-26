@@ -85,6 +85,10 @@ class SupabaseLoader(BaseLoader):
     def build_text(self, row: dict) -> str:
         """Convierte un registro en texto indexable usando solo SUPABASE_TEXT_COLUMNS."""
         parts = []
+        record_id = row.get(self.id_column)
+        if record_id is not None:
+            parts.append(f"id: {record_id}")
+
         for column in self.text_columns:
             value = row.get(column)
             if value is None or value == "":

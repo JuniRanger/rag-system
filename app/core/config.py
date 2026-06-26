@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     SUPABASE_TEXT_COLUMNS: str = ""
     SUPABASE_WEBHOOK_SECRET: str = ""
     SUPABASE_SYNC_SECRET: str = ""
+    # Tool calling en generación RAG (independiente de webhook/sync).
+    # False → streaming habilitado; True → /query usa herramientas Supabase, /query/stream no.
+    ENABLE_RAG_TOOLS: bool = False
 
     # --- Rutas de datos ---
     RAW_DATA_PATH: str = "data/raw"

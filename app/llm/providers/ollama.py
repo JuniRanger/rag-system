@@ -1,8 +1,20 @@
+import asyncio
+
 import ollama
 
 from app.core.config import settings
 from app.core.logger import logger
 from app.llm.base import BaseLLMProvider
+
+_STREAM_END = object()
+
+
+def _stream_next_chunk(stream) -> object:
+    try:
+        chunk = next(stream)
+    except StopIteration:
+        return _STREAM_END
+    return chunk.get("message", {}).get("content", "") or ""
 
 
 class OllamaLLMProvider(BaseLLMProvider):
@@ -62,6 +74,26 @@ class OllamaLLMProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"Error en llamada al LLM: {e}")
             raise
+
+    async def stream_response_async(
+        self,
+        messages: list[dict],
+        options: dict = None,
+    ):
+        stream = ollama.chat(
+            model=self.model,
+            messages=messages,
+            stream=True,
+            options=options,
+            keep_alive=settings.OLLAMA_KEEP_ALIVE,
+        )
+
+        while True:
+            chunk = await asyncio.to_thread(_stream_next_chunk, stream)
+            if chunk is _STREAM_END:
+                break
+            if chunk:
+                yield chunk
 
     def chat(self, messages: list[dict], stream: bool = False) -> str:
         return self.generate_response(messages, stream=stream)

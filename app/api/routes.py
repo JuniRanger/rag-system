@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from app.api.schemas import (
     IngestRequest,
     IngestResponse,
@@ -183,6 +184,34 @@ async def query_rag(request: RAGRequest):
     except Exception as e:
         logger.error(f"Error en consulta RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/query/stream", tags=["RAG"])
+async def query_rag_stream(request: RAGRequest):
+    """
+    Consulta conversacional con streaming SSE.
+    Eventos: token (fragmentos de respuesta), done (respuesta final + summary + metadata).
+    """
+    logger.info(
+        f"Request de consulta stream | conversation_id={request.conversation_id} | "
+        f"message='{request.message.content}'"
+    )
+
+    pipeline = create_rag_pipeline(use_reranker=request.options.use_reranker)
+
+    async def event_stream():
+        async for event in pipeline.run_stream(request):
+            yield event
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 # ─── EVALUACIÓN ───────────────────────────────────────────────────────────────
 

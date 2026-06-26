@@ -24,6 +24,8 @@ async def run_tool_augmented_generation(
     llm_provider: BaseLLMProvider,
     query: str,
     context_text: str,
+    conversation_history: str = "",
+    working_memory: str = "",
 ) -> dict:
     """
     Ejecuta generación con tool calling de Ollama.
@@ -33,7 +35,14 @@ async def run_tool_augmented_generation(
     if not tools:
         raise ValueError("No hay herramientas registradas para tool calling.")
 
-    prompt = TOOL_AUGMENTED_RAG_PROMPT.format(context=context_text, question=query)
+    history_text = conversation_history.strip() or "(sin historial previo)"
+    memory_text = working_memory.strip() or "(sin contexto activo de diagnóstico)"
+    prompt = TOOL_AUGMENTED_RAG_PROMPT.format(
+        working_memory=memory_text,
+        conversation_history=history_text,
+        context=context_text,
+        question=query,
+    )
     messages: list[dict] = [{"role": "user", "content": prompt}]
     tools_used: list[dict] = []
     tokens_input = estimate_tokens(prompt)
