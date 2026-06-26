@@ -226,7 +226,7 @@ def test_run_tool_augmented_generation_executes_tool_and_returns_answer(register
 @pytest.mark.integration
 def test_ollama_tool_calling_live(registered_tools):
     payload = {
-        "model": "qwen2.5:3b",
+        "model": "llama3.2:1b",
         "messages": [
             {
                 "role": "user",

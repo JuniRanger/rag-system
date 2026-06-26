@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # --- Ollama (tu LLM local) ---
     OLLAMA_BASE_URL: str = "http://172.17.0.1:11434"
-    OLLAMA_MODEL: str = "qwen2.5:3b"
+    OLLAMA_MODEL: str = "llama3.2:1b"
     OLLAMA_KEEP_ALIVE: str = "24h"
 
     # --- Qdrant (tu base de datos vectorial) ---

@@ -2,11 +2,9 @@
 
 Local **Retrieval-Augmented Generation** API: Ingests documents (PDF/TXT/MD), indexes them into **Qdrant** using **Sentence Transformers** embeddings, and answers questions with **Ollama** relying strictly on the retrieved context.
 
-
 ---
 
 ## Architecture
-
 
 ```
 
@@ -16,15 +14,14 @@ Question →  Embedding  →  Search  →  Rerank (LLM)   →  Generation (Ollam
 
 ```
 
-| Component | Technology | Role |
-|-----------|------------|------|
-| API | FastAPI + Uvicorn | HTTP Endpoints |
-| Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` (384d) | Text → Vectors |
-| Vector DB | Qdrant (HNSW, cosine) | Storage and Semantic Search |
-| LLM | Ollama (`qwen2.5:3b` by default) | Rerank + Final Answer |
+| Component  | Technology                                     | Role                        |
+| ---------- | ---------------------------------------------- | --------------------------- |
+| API        | FastAPI + Uvicorn                              | HTTP Endpoints              |
+| Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` (384d) | Text → Vectors              |
+| Vector DB  | Qdrant (HNSW, cosine)                          | Storage and Semantic Search |
+| LLM        | Ollama (`llama3.2:1b` by default)              | Rerank + Final Answer       |
 
 ### Project Structure
-
 
 ```
 
@@ -49,7 +46,7 @@ app/
 - [Ollama](https://ollama.ai/) running on the host machine (Local GPU/CPU; does not run inside the API container)
 
 ```bash
-ollama pull qwen2.5:3b
+ollama pull llama3.2:1b
 OLLAMA_KEEP_ALIVE=24h ollama serve
 
 ```
@@ -67,7 +64,7 @@ Typical configuration values in `.env`:
 
 ```env
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:3b
+OLLAMA_MODEL=llama3.2:1b
 OLLAMA_KEEP_ALIVE=24h
 
 QDRANT_HOST=localhost
@@ -161,15 +158,15 @@ docker compose up -d --build
 
 Services:
 
-| Service | Port | Description |
-| --- | --- | --- |
-| `qdrant` | 6333 | Vector Database |
-| `app` | 8000 | FastAPI Application |
+| Service  | Port | Description         |
+| -------- | ---- | ------------------- |
+| `qdrant` | 6333 | Vector Database     |
+| `app`    | 8000 | FastAPI Application |
 
 Compose Environment Variables for the `app` container:
 
-* `QDRANT_HOST=qdrant`
-* `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+- `QDRANT_HOST=qdrant`
+- `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 
 Mounted Volumes: `data/`, `logs/`, `.env` (read-only).
 
@@ -188,13 +185,13 @@ docker run --rm -p 8000:8000 \
 
 ## Endpoints
 
-| Method | Route | Description |
-| --- | --- | --- |
-| GET | `/api/v1/health` | Ollama + Qdrant connection status |
-| POST | `/api/v1/ingest` | Indexes `source_path` (file or folder) |
-| POST | `/api/v1/query` | Executes the RAG query pipeline |
-| POST | `/api/v1/evaluate` | Runs a system performance benchmark (`dataset_path` optional) |
-| GET | `/api/v1/collection/info` | Fetches Qdrant collection statistics and details |
+| Method | Route                     | Description                                                   |
+| ------ | ------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/v1/health`          | Ollama + Qdrant connection status                             |
+| POST   | `/api/v1/ingest`          | Indexes `source_path` (file or folder)                        |
+| POST   | `/api/v1/query`           | Executes the RAG query pipeline                               |
+| POST   | `/api/v1/evaluate`        | Runs a system performance benchmark (`dataset_path` optional) |
+| GET    | `/api/v1/collection/info` | Fetches Qdrant collection statistics and details              |
 
 ## Under the Hood (How it was built)
 
@@ -202,22 +199,22 @@ docker run --rm -p 8000:8000 \
 2. **Embeddings** (`app/embeddings/`): Maps each text chunk to a normalized $384$-dimensional vector.
 3. **Indexing** (`app/vectorstore/`): Upserts points into Qdrant alongside data payloads containing `text`, `filename`, `chunk_index`, and search `score`.
 4. **Query Engine** (`app/rag/chain.py`):
-* Performs a semantic search filtered by a 0.4 threshold setting (`TOP_K` candidates).
-* Runs a batch reranking pipeline via the LLM to filter down to the top 3 chunks.
-* Applies a highly restrictive system prompt (`app/core/prompts.py`) forcing the engine to reply *only* using the matched context.
 
+- Performs a semantic search filtered by a 0.4 threshold setting (`TOP_K` candidates).
+- Runs a batch reranking pipeline via the LLM to filter down to the top 3 chunks.
+- Applies a highly restrictive system prompt (`app/core/prompts.py`) forcing the engine to reply _only_ using the matched context.
 
 5. **Startup Handling** (`lifespan` in `main.py`): Pre-loads the embedding network, verifies Qdrant node reachability, and warms up Ollama memory state (`num_predict: 1`).
 6. **Evaluation Module** (`app/evaluation/`): Evaluates $N$ validation queries through the pipeline to compute core performance metrics: Precision, Recall, Faithfulness, and Relevancy, generating an export at `data/processed/evaluation_report.json`.
 
 ## Data Storage on Disk
 
-| Path | Description |
-| --- | --- |
-| `data/raw/` | Raw source documents |
-| `data/chunks/chunks.json` | Generated text chunks after ingestion |
+| Path                                    | Description                                       |
+| --------------------------------------- | ------------------------------------------------- |
+| `data/raw/`                             | Raw source documents                              |
+| `data/chunks/chunks.json`               | Generated text chunks after ingestion             |
 | `data/processed/evaluation_report.json` | JSON output file containing evaluation benchmarks |
-| `logs/rag_system.log` | Persistent application runtime logs |
+| `logs/rag_system.log`                   | Persistent application runtime logs               |
 
 ## Tests
 
