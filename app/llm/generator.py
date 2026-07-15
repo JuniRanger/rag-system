@@ -25,6 +25,12 @@ NO_CONTEXT_ANSWER = (
 NO_CONVERSATION_HISTORY = "(no proporcionado)"
 NO_RAG_CONTEXT = "(no aplica — consulta sin búsqueda documental)"
 
+# Respuesta unificada para solicitudes bloqueadas
+REJECTION_ANSWER = (
+    "Como tu asistente mecánico, estoy especializado únicamente en resolver dudas sobre autos, "
+    "motos y fallas mecánicas. ¿Hay algo en lo que pueda ayudarte con tu vehículo?"
+)
+
 
 def uses_tool_augmented_generation() -> bool:
     return (
@@ -44,6 +50,18 @@ class ResponseGenerator:
         context_chunks: list[dict],
         fallback_context: str | None = None,
     ) -> dict:
+        # 1. Intercepción temprana para respuestas síncronas estándar
+        if plan.current_question == "REJECT_OUT_OF_SCOPE_REQUEST":
+            logger.info("Intercepción de seguridad ejecutada en generate() | Solicitud fuera de ámbito bloqueada.")
+            return {
+                "answer": REJECTION_ANSWER,
+                "context_used": [],
+                "context_text": "",
+                "tools_used": [],
+                "tokens_input": 0,
+                "tokens_output": 0,
+            }
+
         prompt, context_text, history_text = self._build_prompt(
             plan=plan,
             context_chunks=context_chunks,
@@ -57,8 +75,7 @@ class ResponseGenerator:
 
         tools_used = []
         tokens_input = estimate_tokens(prompt)
-        tokens_output = 0
-
+        
         if plan.run_rag and uses_tool_augmented_generation():
             logger.info("Generando respuesta con herramientas Supabase")
             tool_result = await run_tool_augmented_generation(
@@ -71,7 +88,7 @@ class ResponseGenerator:
             answer = tool_result["answer"]
             tools_used = tool_result.get("tools_used", [])
             tokens_input += tool_result.get("tokens_input", 0)
-            tokens_output += tool_result.get("tokens_output", 0)
+            tokens_output = tool_result.get("tokens_output", 0)
         else:
             messages = [{"role": "user", "content": prompt}]
             answer = await self.client.generate_response_async(messages)
@@ -94,6 +111,12 @@ class ResponseGenerator:
         context_chunks: list[dict],
         fallback_context: str | None = None,
     ) -> AsyncIterator[str]:
+        # 2. Intercepción temprana para el flujo de Streaming
+        if plan.current_question == "REJECT_OUT_OF_SCOPE_REQUEST":
+            logger.info("Intercepción de seguridad ejecutada en stream_generate() | Retornando token estático.")
+            yield REJECTION_ANSWER
+            return
+
         if plan.run_rag and uses_tool_augmented_generation():
             raise StreamingNotSupportedError(
                 "El streaming no está disponible cuando hay herramientas Supabase activas. "

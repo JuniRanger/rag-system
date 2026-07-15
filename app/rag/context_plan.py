@@ -1,10 +1,15 @@
 from dataclasses import dataclass
-
 from app.rag.intent import QueryIntent, detect_intent, has_explicit_reference
 from app.rag.schemas import ChatMessage, RAGRequest, WorkingMemory
 from app.rag.vehicle import extract_problem, extract_vehicle, vehicles_are_different
 from app.core.logger import logger
 
+# Filtro estricto de seguridad para mitigar inyecciones o desvíos de contexto
+PALABRAS_PROHIBIDAS = [
+    "drop database", "drop table", "select * from", "delete from", 
+    "insert into", "truncate", "sql", "execute command", "escribe un codigo", 
+    "genera un script", "hack", "system prompt", "instrucciones del sistema"
+]
 
 @dataclass(frozen=True)
 class GenerationPlan:
@@ -66,7 +71,16 @@ def _build_retrieval_query(memory: WorkingMemory, message: str) -> str:
 def plan_request(request: RAGRequest) -> GenerationPlan:
     message = request.effective_query()
     previous_memory = request.working_memory
+    
+    # 1. Intercepción temprana por palabras clave sospechosas
+    contiene_prohibidas = any(palabra in message.lower() for palabra in PALABRAS_PROHIBIDAS)
+    
+    # Detectamos la intención normal
     intent = detect_intent(message, previous_memory)
+    
+    # Si contiene palabras prohibidas, forzamos que sea OUT_OF_SCOPE
+    if contiene_prohibidas:
+        intent = QueryIntent.OUT_OF_SCOPE
 
     detected_vehicle = extract_vehicle(message)
     vehicle_changed = vehicles_are_different(detected_vehicle, previous_memory.vehicle)
@@ -79,15 +93,23 @@ def plan_request(request: RAGRequest) -> GenerationPlan:
         vehicle_changed=vehicle_changed,
     )
 
+    # El RAG únicamente corre si la intención es puramente automotriz
     run_rag = intent == QueryIntent.AUTOMOTIVE
 
-    include_history = intent == QueryIntent.MEMORY_REQUEST or (
-        intent == QueryIntent.AUTOMOTIVE and has_explicit_reference(message)
-    )
+    # 2. Control de daños si está fuera de ámbito (Hacking, código, temas random)
+    if intent == QueryIntent.OUT_OF_SCOPE:
+        # Reemplazamos la pregunta con un token seguro para que el generador actúe inmediatamente
+        current_question = "REJECT_OUT_OF_SCOPE_REQUEST"
+        retrieval_query = ""
+        include_history = False
+    else:
+        current_question = message
+        include_history = intent == QueryIntent.MEMORY_REQUEST or (
+            intent == QueryIntent.AUTOMOTIVE and has_explicit_reference(message)
+        )
+        retrieval_query = _build_retrieval_query(working_memory, message) if run_rag else message
 
     conversation_history = _format_recent_messages(request.recent_messages) if include_history else ""
-
-    retrieval_query = _build_retrieval_query(working_memory, message) if run_rag else message
 
     logger.info(
         f"Plan generado | intent={intent.value} | run_rag={run_rag} | "
@@ -103,5 +125,5 @@ def plan_request(request: RAGRequest) -> GenerationPlan:
         vehicle_changed=vehicle_changed,
         retrieval_query=retrieval_query,
         conversation_history=conversation_history,
-        current_question=message,
+        current_question=current_question,
     )

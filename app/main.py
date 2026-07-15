@@ -5,7 +5,7 @@ from app.api.routes import router
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.providers import get_embedding_provider, get_llm_provider, get_vector_store_provider
-from app.llm.model_config import get_active_ollama_model
+from app.llm.model_config import get_active_ollama_model, get_active_ollama_reranker_model, is_ollama_model_verified
 from app.tools import register_all_tools
 
 
@@ -33,11 +33,16 @@ async def lifespan(app: FastAPI):
     logger.info("Verificando proveedor LLM...")
     llm = get_llm_provider()
     if llm.is_available():
-        logger.info("Proveedor LLM disponible")
+        logger.info(f"Ollama: disponible ({settings.OLLAMA_BASE_URL})")
     else:
-        logger.warning(" Proveedor LLM no disponible — verifica su configuración")
+        logger.warning(f"Ollama: NO ALCANZABLE ({settings.OLLAMA_BASE_URL})")
 
-    logger.info(f"Modelo LLM activo: {get_active_ollama_model()}")
+    active_model = get_active_ollama_model()
+    if is_ollama_model_verified():
+        logger.info(f"Modelo LLM activo: {active_model}")
+    else:
+        logger.warning(f"Modelo LLM activo: {active_model} (sin verificar)")
+    logger.info(f"Modelo Reranker : {get_active_ollama_reranker_model()}")
     logger.info(f"Embedding model: {settings.EMBEDDING_MODEL_NAME}")
     logger.info(f"Chunk size     : {settings.CHUNK_SIZE} | Overlap: {settings.CHUNK_OVERLAP}")
     logger.info(f"Top-K          : {settings.TOP_K}")

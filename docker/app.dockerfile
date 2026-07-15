@@ -32,7 +32,7 @@ RUN mkdir -p data/raw data/chunks data/processed logs \
 EXPOSE 8000
 
 # Healthcheck básico
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+HEALTHCHECK --interval=300s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Startup

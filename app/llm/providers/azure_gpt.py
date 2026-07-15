@@ -10,5 +10,6 @@ class AzureGPTLLMProvider(BaseLLMProvider):
         messages: list[dict],
         stream: bool = False,
         options: dict = None,
+        model: str | None = None,
     ) -> str:
         raise NotImplementedError("Azure GPT aún no está implementado.")

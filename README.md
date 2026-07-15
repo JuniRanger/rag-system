@@ -168,7 +168,7 @@ Compose Environment Variables for the `app` container:
 - `QDRANT_HOST=qdrant`
 - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 
-Mounted Volumes: `data/`, `logs/`, `.env` (read-only).
+Mounted Volumes: `data/`, `.env` (read-only).
 
 Standalone API Image Build:
 
@@ -214,7 +214,6 @@ docker run --rm -p 8000:8000 \
 | `data/raw/`                             | Raw source documents                              |
 | `data/chunks/chunks.json`               | Generated text chunks after ingestion             |
 | `data/processed/evaluation_report.json` | JSON output file containing evaluation benchmarks |
-| `logs/rag_system.log`                   | Persistent application runtime logs               |
 
 ## Tests
 

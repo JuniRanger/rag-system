@@ -115,11 +115,18 @@ class RAGChain:
         logger.info(f"Chunks recuperados: {chunks_retrieved}")
 
         if use_reranker:
-            chunks = await self.reranker.rerank(plan.retrieval_query, chunks)
+            chunks = await self.reranker.rerank(
+                plan.retrieval_query,
+                chunks,
+                top_k=options.top_k,
+            )
 
         chunks = chunks[: options.max_chunks]
         chunks_used = len(chunks)
-        logger.info(f"Chunks usados tras reranking: {chunks_used}")
+        logger.info(
+            f"Chunks usados tras reranking: {chunks_used} "
+            f"(top_k={options.top_k}, max_chunks={options.max_chunks})"
+        )
 
         return {
             "query": plan.current_question,

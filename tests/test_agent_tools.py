@@ -6,7 +6,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from app.llm.ollama_client import get_ollama_base_url
+from app.llm.ollama_client import get_OLLAMA_BASE_URL
 from app.llm.model_config import get_active_ollama_model
 from app.rag.tool_loop import _parse_tool_arguments, run_tool_augmented_generation
 from app.tools.executor import tool_executor
@@ -241,7 +241,7 @@ def test_ollama_tool_calling_live(registered_tools):
         "stream": False,
     }
 
-    ollama_chat_url = f"{get_ollama_base_url()}/api/chat"
+    ollama_chat_url = f"{get_OLLAMA_BASE_URL()}/api/chat"
 
     try:
         response = httpx.post(
@@ -251,7 +251,7 @@ def test_ollama_tool_calling_live(registered_tools):
         )
         response.raise_for_status()
     except httpx.ConnectError:
-        pytest.skip(f"Ollama no está disponible en {get_ollama_base_url()}")
+        pytest.skip(f"Ollama no está disponible en {get_OLLAMA_BASE_URL()}")
 
     message = response.json().get("message", {})
     tool_calls = message.get("tool_calls", [])

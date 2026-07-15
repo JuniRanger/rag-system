@@ -16,8 +16,8 @@ class ChatMessage(BaseModel):
 
 class RAGQueryOptions(BaseModel):
     use_reranker: bool = True
-    top_k: int = Field(default=5, ge=1, le=50)
-    max_chunks: int = Field(default=3, ge=1, le=20)
+    top_k: int = Field(default=10, ge=1, le=50)
+    max_chunks: int = Field(default=10, ge=1, le=20)
 
 
 class WorkingMemory(BaseModel):
@@ -70,8 +70,8 @@ class RAGRequest(BaseModel):
                 },
                 "options": {
                     "use_reranker": True,
-                    "top_k": 5,
-                    "max_chunks": 3,
+                    "top_k": 10,
+                    "max_chunks": 10,
                 },
             }
         }

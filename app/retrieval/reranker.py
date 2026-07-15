@@ -5,19 +5,29 @@ from app.core.config import settings
 from app.core.prompts import RERANK_PROMPT
 from app.core.logger import logger
 from app.llm.base import BaseLLMProvider
+from app.llm.model_config import get_active_ollama_reranker_model
 
 
 class Reranker:
     def __init__(self, llm_provider: BaseLLMProvider):
         self.llm_provider = llm_provider
-        self.model = getattr(llm_provider, "model", llm_provider.__class__.__name__)
-        logger.info(f"Reranker inicializado dinámicamente con el modelo: {self.model}")
+        self.model = get_active_ollama_reranker_model()
+        logger.info(f"Reranker inicializado con modelo: {self.model}")
 
-    async def rerank(self, query: str, chunks: list[dict]) -> list[dict]:
+    async def rerank(
+        self,
+        query: str,
+        chunks: list[dict],
+        top_k: int | None = None,
+    ) -> list[dict]:
         if not chunks or len(chunks) <= 1:
             return chunks
 
-        logger.info(f"Rerank con {self.model} en Batch iniciado para {len(chunks)} chunks (top_k=5)")
+        effective_top_k = top_k if top_k is not None else settings.TOP_K
+        logger.info(
+            f"Rerank con {self.model} en Batch iniciado para {len(chunks)} chunks "
+            f"(top_k={effective_top_k})"
+        )
 
         chunks_input = ""
         for idx, chunk in enumerate(chunks):
@@ -35,6 +45,7 @@ class Reranker:
                         "num_predict": 100,
                         "format": "json",
                     },
+                    model=self.model,
                 )
             ).strip()
 
@@ -70,7 +81,10 @@ class Reranker:
                     original_chunk["rerank_score"] = 0.0
                     reranked_chunks.append(original_chunk)
 
-            logger.info("Batch Reranking completado con éxito con el LLM local")
+            logger.info(
+                f"Batch Reranking completado | modelo={self.model} | "
+                f"chunks={len(reranked_chunks)} | top_k={effective_top_k}"
+            )
             return reranked_chunks
 
         except Exception as error:

@@ -10,6 +10,7 @@ class BaseLLMProvider(ABC):
         messages: list[dict],
         stream: bool = False,
         options: dict = None,
+        model: str | None = None,
     ) -> str:
         """Genera una respuesta a partir de una lista de mensajes."""
         raise NotImplementedError
@@ -19,6 +20,7 @@ class BaseLLMProvider(ABC):
         messages: list[dict],
         stream: bool = False,
         options: dict = None,
+        model: str | None = None,
     ) -> str:
         """Versión asíncrona; por defecto delega al cliente síncrono en un thread."""
         return await asyncio.to_thread(
@@ -26,6 +28,7 @@ class BaseLLMProvider(ABC):
             messages,
             stream,
             options,
+            model,
         )
 
     async def stream_response_async(

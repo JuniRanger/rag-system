@@ -11,5 +11,5 @@ def get_ollama_client() -> ollama.Client:
     return ollama.Client(host=settings.OLLAMA_BASE_URL)
 
 
-def get_ollama_base_url() -> str:
+def get_OLLAMA_BASE_URL() -> str:
     return settings.OLLAMA_BASE_URL.rstrip("/")

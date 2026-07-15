@@ -1,7 +1,11 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
-from app.core.llm_models import DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_MODEL_FALLBACK
+from app.core.llm_models import (
+    DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OLLAMA_MODEL_FALLBACK,
+    DEFAULT_OLLAMA_RERANKER_MODEL,
+)
 
 class Settings(BaseSettings):
       # --- Aplicación ---
@@ -11,9 +15,10 @@ class Settings(BaseSettings):
     PROVIDER_TYPE: str = "LOCAL"
 
     # --- Ollama (tu LLM local) ---
-    OLLAMA_BASE_URL: str = "http://172.17.0.1:11434"
+    OLLAMA_BASE_URL: str = "http://host.docker.internal:11434"
     OLLAMA_MODEL: str = DEFAULT_OLLAMA_MODEL
     OLLAMA_MODEL_FALLBACK: str = DEFAULT_OLLAMA_MODEL_FALLBACK
+    OLLAMA_RERANKER_MODEL: str = DEFAULT_OLLAMA_RERANKER_MODEL
     OLLAMA_KEEP_ALIVE: str = "24h"
 
     # --- Qdrant (tu base de datos vectorial) ---
@@ -31,7 +36,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 50
 
     # --- Retrieval (cuántos fragmentos recuperamos) ---
-    TOP_K: int = 5
+    TOP_K: int = 10
 
     # --- Supabase (ingesta desde tabla) — valores en .env ---
     SUPABASE_URL: str = ""
