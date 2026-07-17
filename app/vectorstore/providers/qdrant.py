@@ -14,16 +14,16 @@ from app.vectorstore.base import BaseVectorStoreProvider
 
 
 class QdrantVectorStoreProvider(BaseVectorStoreProvider):
-    def __init__(self):
-        logger.info(f"Conectando a Qdrant en {settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
+    def __init__(self) -> None:
+        logger.info(f"Conectando a Qdrant Cloud: {settings.qdrant_url}")
         self.client = QdrantClient(
-            host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT,
+            url=settings.qdrant_url,
+            api_key=settings.qdrant_api_key,
         )
-        logger.info("Conexión a Qdrant establecida")
+        logger.info("Conexión a Qdrant Cloud establecida")
 
     def create_collection(self, recreate: bool = False, vector_size: int | None = None):
-        collection_name = settings.QDRANT_COLLECTION_NAME
+        collection_name = settings.qdrant_collection_name
         resolved_size = vector_size or settings.EMBEDDING_DIMENSION
 
         if resolved_size != settings.EMBEDDING_DIMENSION:
@@ -80,7 +80,7 @@ class QdrantVectorStoreProvider(BaseVectorStoreProvider):
             logger.warning("insert_points llamado sin chunks")
             return 0
 
-        vector_size = self._get_collection_vector_size(settings.QDRANT_COLLECTION_NAME)
+        vector_size = self._get_collection_vector_size(settings.qdrant_collection_name)
         points = []
 
         for index, chunk in enumerate(chunks):
@@ -103,7 +103,7 @@ class QdrantVectorStoreProvider(BaseVectorStoreProvider):
         for start in range(0, len(points), batch_size):
             batch = points[start : start + batch_size]
             self.client.upsert(
-                collection_name=settings.QDRANT_COLLECTION_NAME,
+                collection_name=settings.qdrant_collection_name,
                 points=batch,
             )
             logger.debug(f"Insertados {min(start + batch_size, len(points))}/{len(points)} puntos")
@@ -116,7 +116,7 @@ class QdrantVectorStoreProvider(BaseVectorStoreProvider):
         if not query_vector:
             raise ValueError("El vector de consulta no puede estar vacío.")
 
-        expected_size = self._get_collection_vector_size(settings.QDRANT_COLLECTION_NAME)
+        expected_size = self._get_collection_vector_size(settings.qdrant_collection_name)
         if len(query_vector) != expected_size:
             raise ValueError(
                 f"Dimensión del query vector ({len(query_vector)}) != dimensión de la colección ({expected_size})."
@@ -125,7 +125,7 @@ class QdrantVectorStoreProvider(BaseVectorStoreProvider):
         k = top_k or settings.TOP_K
 
         results = self.client.search(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
+            collection_name=settings.qdrant_collection_name,
             query_vector=query_vector,
             limit=k,
             with_payload=True,
@@ -152,12 +152,12 @@ class QdrantVectorStoreProvider(BaseVectorStoreProvider):
         return normalized_results
 
     def get_collection_info(self) -> dict:
-        """Retorna estadísticas de la colección."""
-        info = self.client.get_collection(settings.QDRANT_COLLECTION_NAME)
+        """Retorna estadísticas de la colección en Qdrant Cloud."""
+        info = self.client.get_collection(settings.qdrant_collection_name)
         return {
-            "name": settings.QDRANT_COLLECTION_NAME,
+            "name": settings.qdrant_collection_name,
             "total_points": info.points_count,
-            "vector_size": self._get_collection_vector_size(settings.QDRANT_COLLECTION_NAME),
+            "vector_size": self._get_collection_vector_size(settings.qdrant_collection_name),
             "status": str(info.status),
         }
 

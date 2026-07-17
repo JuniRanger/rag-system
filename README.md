@@ -8,7 +8,7 @@ Local **Retrieval-Augmented Generation** API: Ingests documents (PDF/TXT/MD), in
 
 ```
 
-PDF/TXT  →  Ingestion  →  Chunks  →  Embeddings  →  Qdrant
+PDF/TXT  →  Ingestion  →  Chunks  →  Embeddings  →  Qdrant Cloud
 ↑
 Question →  Embedding  →  Search  →  Rerank (LLM)   →  Generation (Ollama)
 
@@ -18,7 +18,7 @@ Question →  Embedding  →  Search  →  Rerank (LLM)   →  Generation (Ollam
 | ---------- | ---------------------------------------------- | --------------------------- |
 | API        | FastAPI + Uvicorn                              | HTTP Endpoints              |
 | Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` (384d) | Text → Vectors              |
-| Vector DB  | Qdrant (HNSW, cosine)                          | Storage and Semantic Search |
+| Vector DB  | Qdrant Cloud (HNSW, cosine)                    | Storage and Semantic Search |
 | LLM        | Ollama (`llama3.2:1b` by default)              | Rerank + Final Answer       |
 
 ### Project Structure
@@ -42,7 +42,8 @@ app/
 ## Requirements
 
 - Python 3.11+
-- [Docker](https://docs.docker.com/) and Docker Compose (optional, recommended for Qdrant + API)
+- A [Qdrant Cloud](https://cloud.qdrant.io/) cluster (URL + API key)
+- [Docker](https://docs.docker.com/) and Docker Compose (optional, for packaging the API)
 - [Ollama](https://ollama.ai/) running on the host machine (Local GPU/CPU; does not run inside the API container)
 
 ```bash
@@ -64,11 +65,12 @@ Typical configuration values in `.env`:
 
 ```env
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2:1b
+OLLAMA_MODEL=llama3:8b
 OLLAMA_KEEP_ALIVE=24h
 
-QDRANT_HOST=localhost
-QDRANT_PORT=6333
+# Qdrant Cloud (required) — from the Qdrant Cloud console
+QDRANT_URL=https://YOUR-CLUSTER-ID.REGION.cloud.qdrant.io:6333
+QDRANT_API_KEY=your-qdrant-cloud-api-key
 QDRANT_COLLECTION_NAME=documents
 
 EMBEDDING_MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
@@ -81,7 +83,14 @@ DEBUG=False
 
 ```
 
-When running with Docker, set `QDRANT_HOST=qdrant` and `OLLAMA_BASE_URL=http://host.docker.internal:11434` (see Docker section below).
+### Qdrant Cloud setup
+
+1. Create a cluster in [Qdrant Cloud](https://cloud.qdrant.io/).
+2. Copy the cluster **URL** and **API Key** from the console.
+3. Set them in `.env` as `QDRANT_URL` and `QDRANT_API_KEY` (no defaults in the app).
+4. Keep `QDRANT_COLLECTION_NAME=documents` unless you intentionally use another collection name.
+
+When running the API container, set `OLLAMA_BASE_URL=http://host.docker.internal:11434` so the container can reach Ollama on the host (see Docker section below). Qdrant is always remote (Cloud); do not point it at Docker networking.
 
 ## Local Deployment (Without API Docker container)
 
@@ -94,12 +103,9 @@ pip install -r requirements.txt
 
 ```
 
-### 2. Qdrant
+### 2. Configure Qdrant Cloud
 
-```bash
-docker compose up -d qdrant
-
-```
+Ensure `.env` has a valid `QDRANT_URL` and `QDRANT_API_KEY` (see above). No local Qdrant container is required.
 
 ### 3. Start the API
 
@@ -146,9 +152,9 @@ python scripts/test_query.py   # If available in your environment
 
 ```
 
-## Docker Deployment (Qdrant + API)
+## Docker Deployment (API only)
 
-The API is built using `docker/app.dockerfile`. **Ollama runs natively on the host** (accessed via `host.docker.internal`).
+The API is built using `docker/app.dockerfile`. **Ollama runs natively on the host** (via `host.docker.internal`). **Qdrant runs in Qdrant Cloud** (credentials from `.env`).
 
 ```bash
 # Run from the project root directory
@@ -158,25 +164,23 @@ docker compose up -d --build
 
 Services:
 
-| Service  | Port | Description         |
-| -------- | ---- | ------------------- |
-| `qdrant` | 6333 | Vector Database     |
-| `app`    | 8000 | FastAPI Application |
+| Service | Port | Description         |
+| ------- | ---- | ------------------- |
+| `app`   | 8000 | FastAPI Application |
 
-Compose Environment Variables for the `app` container:
+Compose notes:
 
-- `QDRANT_HOST=qdrant`
-- `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+- `QDRANT_URL` and `QDRANT_API_KEY` come from `.env` (`env_file`)
+- `OLLAMA_BASE_URL=http://host.docker.internal:11434` for host Ollama
 
-Mounted Volumes: `data/`, `.env` (read-only).
+Mounted Volumes: `data/`, Hugging Face cache. `.env` is loaded via `env_file`.
 
 Standalone API Image Build:
 
 ```bash
 docker build -f docker/app.dockerfile -t rag-system-api .
 docker run --rm -p 8000:8000 \
-  -e QDRANT_HOST=host.docker.internal \
-  -e OLLAMA_BASE_URL=[http://host.docker.internal:11434](http://host.docker.internal:11434) \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
   --env-file .env \
   -v "$(pwd)/data:/app/data" \
   rag-system-api
@@ -204,7 +208,7 @@ docker run --rm -p 8000:8000 \
 - Runs a batch reranking pipeline via the LLM to filter down to the top 3 chunks.
 - Applies a highly restrictive system prompt (`app/core/prompts.py`) forcing the engine to reply _only_ using the matched context.
 
-5. **Startup Handling** (`lifespan` in `main.py`): Pre-loads the embedding network, verifies Qdrant node reachability, and warms up Ollama memory state (`num_predict: 1`).
+5. **Startup Handling** (`lifespan` in `main.py`): Pre-loads the embedding network, verifies Qdrant Cloud reachability, and warms up Ollama memory state (`num_predict: 1`).
 6. **Evaluation Module** (`app/evaluation/`): Evaluates $N$ validation queries through the pipeline to compute core performance metrics: Precision, Recall, Faithfulness, and Relevancy, generating an export at `data/processed/evaluation_report.json`.
 
 ## Data Storage on Disk

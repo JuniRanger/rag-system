@@ -1,9 +1,13 @@
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from app.core.config import settings
 from app.embeddings.base import BaseEmbeddingProvider
 from app.llm.base import BaseLLMProvider
 from app.vectorstore.base import BaseVectorStoreProvider
+
+if TYPE_CHECKING:
+    from app.retrieval.reranker import Reranker
 
 
 @lru_cache()
@@ -57,6 +61,14 @@ def get_llm_provider() -> BaseLLMProvider:
     raise ValueError(f"PROVIDER_TYPE no soportado para LLM: {settings.PROVIDER_TYPE}")
 
 
+@lru_cache()
+def get_reranker() -> "Reranker":
+    """Singleton del CrossEncoder reranker (una sola carga de pesos)."""
+    from app.retrieval.reranker import Reranker
+
+    return Reranker()
+
+
 def get_provider_bundle() -> tuple[BaseEmbeddingProvider, BaseVectorStoreProvider, BaseLLMProvider]:
     return (
         get_embedding_provider(),
@@ -74,4 +86,5 @@ def create_rag_pipeline(use_reranker: bool = True):
         vector_store_provider=vector_store_provider,
         llm_provider=llm_provider,
         use_reranker=use_reranker,
+        reranker=get_reranker() if use_reranker else None,
     )

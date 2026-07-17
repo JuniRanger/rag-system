@@ -261,23 +261,6 @@ PREGUNTA:
 RESPUESTA:
 """
 
-# El nuevo prompt adaptado para procesamiento en lote (Batch) con inyección dinámica
-RERANK_PROMPT = """Actúa como un clasificador y reordenador semántico de alta precisión.
-Tu tarea es analizar la relevancia de una serie de fragmentos de texto (chunks) respecto a una pregunta específica, y ordenarlos de mayor a menor importancia.
-
-PREGUNTA DEL USUARIO: {question}
-
-FRAGMENTOS DISPONIBLES (Identificados por su ID):
-{chunks}
-
-REGLAS DE SALIDA:
-1. Analiza qué fragmentos contienen la información más directa para responder a la pregunta.
-2. Devuelve EXCLUSIVAMENTE un arreglo JSON plano con los números de ID ordenados de mayor a menor relevancia semántica.
-3. Ejemplo de salida exacta esperada: [2, 0, 3, 1]
-4. NO agregues introducciones, explicaciones, saludos ni código markdown fuera del arreglo. Solo el JSON puro de los IDs.
-
-RESPUESTA EN JSON:"""
-
 CONVERSATION_SUMMARY_PROMPT = """Actualiza el resumen pasivo de esta conversación.
 
 INSTRUCCIONES:

@@ -4,8 +4,13 @@ from contextlib import asynccontextmanager
 from app.api.routes import router
 from app.core.config import settings
 from app.core.logger import logger
-from app.core.providers import get_embedding_provider, get_llm_provider, get_vector_store_provider
-from app.llm.model_config import get_active_ollama_model, get_active_ollama_reranker_model, is_ollama_model_verified
+from app.core.providers import (
+    get_embedding_provider,
+    get_llm_provider,
+    get_reranker,
+    get_vector_store_provider,
+)
+from app.llm.model_config import get_active_ollama_model, is_ollama_model_verified
 from app.tools import register_all_tools
 
 
@@ -13,7 +18,10 @@ from app.tools import register_all_tools
 async def lifespan(app: FastAPI):
     # ── Al arrancar: precargar todo en memoria ──
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")
-    logger.info(f"OLLAMA_BASE_URL : {settings.OLLAMA_BASE_URL}")
+    logger.info(
+        f"OLLAMA_BASE_URL : {settings.ollama_base_url} "
+        f"(runtime={settings.ollama_runtime})"
+    )
     provider_type = settings.PROVIDER_TYPE.upper()
     logger.info(f"Provider type  : {provider_type}")
 
@@ -26,23 +34,32 @@ async def lifespan(app: FastAPI):
     embedder.embed_text("inicialización del sistema")
     logger.info(" Modelo de embeddings listo en RAM")
 
-    logger.info("Verificando conexión al almacén vectorial...")
+    logger.info(f"Verificando conexión a Qdrant Cloud ({settings.qdrant_url})...")
     get_vector_store_provider()
-    logger.info("Almacén vectorial conectado")
+    logger.info(
+        f"Qdrant Cloud conectado | colección={settings.qdrant_collection_name}"
+    )
+
+    logger.info("Precargando CrossEncoder reranker en RAM...")
+    reranker = get_reranker()
+    # Inferencia dummy para calentar kernels / caché de transformers
+    reranker._predict_scores("inicialización del sistema", [{"text": "warmup"}])
+    logger.info(
+        f"Reranker listo | modelo={reranker.model_name} | device={reranker.device}"
+    )
 
     logger.info("Verificando proveedor LLM...")
     llm = get_llm_provider()
     if llm.is_available():
-        logger.info(f"Ollama: disponible ({settings.OLLAMA_BASE_URL})")
+        logger.info(f"Ollama: disponible ({settings.ollama_base_url})")
     else:
-        logger.warning(f"Ollama: NO ALCANZABLE ({settings.OLLAMA_BASE_URL})")
+        logger.warning(f"Ollama: NO ALCANZABLE ({settings.ollama_base_url})")
 
     active_model = get_active_ollama_model()
     if is_ollama_model_verified():
         logger.info(f"Modelo LLM activo: {active_model}")
     else:
         logger.warning(f"Modelo LLM activo: {active_model} (sin verificar)")
-    logger.info(f"Modelo Reranker : {get_active_ollama_reranker_model()}")
     logger.info(f"Embedding model: {settings.EMBEDDING_MODEL_NAME}")
     logger.info(f"Chunk size     : {settings.CHUNK_SIZE} | Overlap: {settings.CHUNK_OVERLAP}")
     logger.info(f"Top-K          : {settings.TOP_K}")

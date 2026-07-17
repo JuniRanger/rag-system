@@ -5,7 +5,7 @@ uvicorn==0.30.6
 # Base de datos vectorial
 qdrant-client==1.11.0
 
-# Embeddings locales (runtime)
+# Embeddings + CrossEncoder reranker (runtime)
 sentence-transformers==3.1.1
 
 # LLM local via Ollama

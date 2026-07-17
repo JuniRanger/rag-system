@@ -53,7 +53,7 @@ async def health_check():
         ollama_available=llm_ok,
         qdrant_available=vector_store_ok,
         model=get_active_ollama_model(),
-        collection=settings.QDRANT_COLLECTION_NAME
+        collection=settings.qdrant_collection_name,
     )
 
 

@@ -1,6 +1,7 @@
 """
 Script para reconstruir el índice vectorial desde los chunks guardados en disco.
-Útil cuando Qdrant se reinició y perdió los datos pero los chunks ya existen.
+Útil si la colección de Qdrant Cloud se recreó o quedó vacía pero los chunks
+ya existen en disco.
 
 Uso:
     python scripts/build_index.py

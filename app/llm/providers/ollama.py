@@ -29,7 +29,7 @@ def _is_model_not_found_error(error: Exception) -> bool:
 
 class OllamaLLMProvider(BaseLLMProvider):
     def __init__(self):
-        self.base_url = settings.OLLAMA_BASE_URL
+        self.base_url = settings.ollama_base_url
         self._client = get_ollama_client()
         self.model = get_active_ollama_model()
         self._verified = is_ollama_model_verified()
@@ -100,7 +100,7 @@ class OllamaLLMProvider(BaseLLMProvider):
         """
         Envía mensajes al LLM y retorna la respuesta.
         messages: lista de dicts con 'role' y 'content'
-        model: override opcional (p. ej. reranker usa un modelo más pequeño)
+        model: override opcional del modelo Ollama para esta llamada
         """
         active_model = model or self.model
         try:

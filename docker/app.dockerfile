@@ -31,8 +31,8 @@ RUN mkdir -p data/raw data/chunks data/processed logs \
 # Exponer API
 EXPOSE 8000
 
-# Healthcheck básico
-HEALTHCHECK --interval=300s --timeout=10s --start-period=120s --retries=3 \
+# start-period más largo: embeddings + CrossEncoder (bge-reranker) + warm-up
+HEALTHCHECK --interval=300s --timeout=10s --start-period=300s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Startup

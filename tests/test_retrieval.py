@@ -25,7 +25,7 @@ def test_retrieval_performance_under_100ms():
 
     start_time = time.time()
     results = vector_store.client.search(
-        collection_name=settings.QDRANT_COLLECTION_NAME,
+        collection_name=settings.qdrant_collection_name,
         query_vector=query_vector,
         limit=10,
         with_payload=False,

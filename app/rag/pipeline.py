@@ -14,6 +14,7 @@ from app.core.logger import logger
 from app.embeddings.base import BaseEmbeddingProvider
 from app.llm.base import BaseLLMProvider
 from app.llm.generator import uses_tool_augmented_generation
+from app.retrieval.reranker import Reranker
 from app.vectorstore.base import BaseVectorStoreProvider
 
 
@@ -67,12 +68,14 @@ class RAGPipeline:
         vector_store_provider: BaseVectorStoreProvider,
         llm_provider: BaseLLMProvider,
         use_reranker: bool = True,
+        reranker: Reranker | None = None,
     ):
         self.chain = RAGChain(
             embedding_provider=embedding_provider,
             vector_store_provider=vector_store_provider,
             llm_provider=llm_provider,
             use_reranker=use_reranker,
+            reranker=reranker,
         )
         self.summarizer = ConversationSummarizer(llm_provider=llm_provider)
         logger.info("RAG Pipeline inicializado")

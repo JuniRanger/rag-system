@@ -4,6 +4,7 @@ from app.retrieval.search import VectorSearch
 from app.retrieval.reranker import Reranker
 from app.llm.generator import ResponseGenerator
 from app.core.logger import logger
+from app.core.providers import get_reranker
 from app.embeddings.base import BaseEmbeddingProvider
 from app.llm.base import BaseLLMProvider
 from app.rag.context_plan import GenerationPlan
@@ -23,12 +24,14 @@ class RAGChain:
         vector_store_provider: BaseVectorStoreProvider,
         llm_provider: BaseLLMProvider,
         use_reranker: bool = True,
+        reranker: Reranker | None = None,
     ):
         self.searcher = VectorSearch(
             embedding_provider=embedding_provider,
             vector_store_provider=vector_store_provider,
         )
-        self.reranker = Reranker(llm_provider=llm_provider)
+        # Singleton inyectado (get_reranker); None si el pipeline desactiva rerank
+        self.reranker = reranker
         self.generator = ResponseGenerator(llm_provider=llm_provider)
         self.default_use_reranker = use_reranker
 
@@ -115,7 +118,8 @@ class RAGChain:
         logger.info(f"Chunks recuperados: {chunks_retrieved}")
 
         if use_reranker:
-            chunks = await self.reranker.rerank(
+            reranker = self.reranker or get_reranker()
+            chunks = await reranker.rerank(
                 plan.retrieval_query,
                 chunks,
                 top_k=options.top_k,
