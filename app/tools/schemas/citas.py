@@ -19,23 +19,26 @@ SCHEMA_CREAR_CITA = {
                 "fecha": {
                     "type": "string",
                     "description": (
-                        "Fecha y hora confirmadas, formato exacto YYYY-MM-DD HH:MM. "
-                        "Si el usuario dio fecha sin hora, usa 10:00. "
-                        "Ejemplo: 2026-07-20 15:00"
+                        "Fecha y hora exactas confirmadas por el usuario, "
+                        "formato YYYY-MM-DD HH:MM. "
+                        "Si falta la fecha o la hora, NO llames la herramienta: "
+                        "pregunta el dato faltante. "
+                        "Nunca inventes ni completes con valores por defecto "
+                        "(ni 10:00 ni ninguna fecha de ejemplo)."
                     ),
                 },
                 "vehiculo": {
                     "type": "string",
                     "description": (
                         "Marca, modelo y año dichos por el usuario. "
-                        "Ejemplo: Mazda 3 2018"
+                        "Si falta, pregunta; no inventes."
                     ),
                 },
                 "producto": {
                     "type": "string",
                     "description": (
-                        "Servicio o componente confirmado. "
-                        "Ejemplo: Balatas delanteras"
+                        "Servicio o componente confirmado por el usuario. "
+                        "Si falta, pregunta; no inventes."
                     ),
                 },
             },

@@ -9,9 +9,10 @@ Permisos:
 
 Para citas:
 
-- solicita los datos faltantes;
+- solicita los datos faltantes (vehículo, servicio, fecha y hora);
+- nunca inventes ni completes fecha u hora;
 - llama crearCitaAPI únicamente cuando tenga:
-  - fecha;
+  - fecha y hora exactas;
   - vehículo;
   - producto/servicio.
 """

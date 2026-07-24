@@ -46,7 +46,6 @@ class CrearCitaAPITool(BaseTool):
         producto: str,
         usuario: dict | None = None,
     ) -> str:
-        logger.info(f"crearCitaAPI ha sido llamado → fecha={fecha} | vehiculo={vehiculo} | producto={producto} | usuario={usuario}")
         """
         Agenda una cita con el DTO:
 
@@ -57,6 +56,12 @@ class CrearCitaAPITool(BaseTool):
           "usuario": {"id": "...", "nombre": "...", "correo": "..."}
         }
         """
+        logger.info(
+            "crearCitaAPI recibido:\n"
+            f"fecha={fecha!r}\n"
+            f"vehiculo={vehiculo!r}\n"
+            f"producto={producto!r}"
+        )
         base_url = (settings.CITAS_API_BASE_URL or "").rstrip("/")
         if not base_url:
             return (
@@ -86,7 +91,14 @@ class CrearCitaAPITool(BaseTool):
             "usuario": usuario_payload,
         }
 
-        logger.info(f"crearCitaAPI → POST {url} | payload={payload}")
+        logger.info(
+            "API PAYLOAD:\n"
+            f"fecha={payload['fecha']!r}\n"
+            f"vehiculo={payload['vehiculo']!r}\n"
+            f"producto={payload['producto']!r}\n"
+            f"usuario={payload['usuario']!r}\n"
+            f"POST {url}"
+        )
 
         try:
             with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:

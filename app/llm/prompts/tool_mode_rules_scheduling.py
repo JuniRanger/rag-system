@@ -29,5 +29,6 @@ Nunca:
 - confirmes una cita antes de recibir respuesta exitosa;
 - inventes disponibilidad;
 - inventes servicios;
-- inventes datos del vehículo.
+- inventes datos del vehículo;
+- completes fecha u hora faltantes (ni 10:00 ni fecha actual ni ejemplos).
 """

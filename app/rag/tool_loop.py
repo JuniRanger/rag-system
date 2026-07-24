@@ -190,9 +190,23 @@ async def _execute_tool_rounds(
         for tool_call in tool_calls:
             function = tool_call.get("function") or {}
             tool_name = function.get("name", "")
-            arguments = _parse_tool_arguments(function.get("arguments"))
+            raw_arguments = _parse_tool_arguments(function.get("arguments"))
             if tool_name == "crearCitaAPI":
-                arguments = _inject_cita_usuario(arguments, cita_usuario)
+                logger.info(
+                    "LLM TOOL CALL:\n"
+                    f"fecha={raw_arguments.get('fecha')!r}\n"
+                    f"vehiculo={raw_arguments.get('vehiculo')!r}\n"
+                    f"producto={raw_arguments.get('producto')!r}"
+                )
+                arguments = _inject_cita_usuario(raw_arguments, cita_usuario)
+                logger.info(
+                    "crearCitaAPI ARGS (post-inject):\n"
+                    f"fecha={arguments.get('fecha')!r}\n"
+                    f"vehiculo={arguments.get('vehiculo')!r}\n"
+                    f"producto={arguments.get('producto')!r}"
+                )
+            else:
+                arguments = raw_arguments
             logger.info(f"Function call solicitada: {tool_name} | args={arguments}")
 
             if user_role == "admin" and tool_name in ADMIN_BLOCKED_TOOLS:
