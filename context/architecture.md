@@ -12,7 +12,7 @@ Entrada HTTP vía FastAPI:
 | ---- | ------- | --------------- |
 | API | `app/api/` | Endpoints HTTP, auth de sync/webhook, schemas de request/response de API |
 | Orquestación RAG | `app/rag/` | Pipeline, planning de intent, chain, memoria, tool loop, SSE |
-| Prompts | `app/core/prompts.py` | Plantillas de texto enviadas al LLM |
+| Prompts | `app/llm/prompts/` | Plantillas de texto enviadas al LLM |
 | LLM | `app/llm/` | Proveedor Ollama (Azure GPT stub) |
 | Recuperación | `app/retrieval/` | Búsqueda vectorial + reranker CrossEncoder |
 | Embeddings | `app/embeddings/` | Sentence Transformers (Azure embeddings stub) |
@@ -43,9 +43,9 @@ Patrón de providers: `PROVIDER_TYPE=LOCAL` (implementado) o `AZURE` (stubs que 
 app/
 ├── main.py                 # FastAPI + lifespan + CORS
 ├── api/                    # Rutas HTTP, schemas API, auth sync/webhook
-├── core/                   # config, prompts, providers, supabase, logger, chunks, documents
+├── core/                   # config, providers, supabase, logger, chunks, documents
 ├── rag/                    # pipeline, chain, intent, context_plan, memory, tool_loop, schemas, sse
-├── llm/                    # base, generator, ollama client/provider, model_config
+├── llm/                    # base, generator, prompts/, ollama client/provider, model_config
 ├── embeddings/             # base + sentence_transformer (+ azure stub)
 ├── vectorstore/            # base, indexer, qdrant (+ azure cosmos stub)
 ├── retrieval/              # search, reranker
@@ -84,7 +84,7 @@ flowchart TD
     Chain --> Rerank[Reranker CrossEncoder]
     Chain --> Gen[ResponseGenerator]
 
-    Gen -->|sin tools| Prompts[app/core/prompts.py]
+    Gen -->|sin tools| Prompts[app/llm/prompts/]
     Gen -->|con tools| ToolLoop[tool_loop.py]
     ToolLoop --> LLM[Ollama LLM]
     Prompts --> LLM

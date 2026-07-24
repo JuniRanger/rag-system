@@ -2,7 +2,11 @@ from collections.abc import AsyncIterator
 
 from app.core.config import settings
 from app.core.documents import source_label
-from app.core.prompts import (
+from app.core.logger import logger
+from app.core.supabase import supabase_configured
+from app.llm.base import BaseLLMProvider
+from app.llm.conversation_format import format_conversation_context
+from app.llm.prompts import (
     CONVERSATION_PROMPT,
     MEMORY_REQUEST_PROMPT,
     OUT_OF_SCOPE_PROMPT,
@@ -10,9 +14,6 @@ from app.core.prompts import (
     SCHEDULING_FALLBACK_PROMPT,
     SUPABASE_RAG_PROMPT,
 )
-from app.core.logger import logger
-from app.core.supabase import supabase_configured
-from app.llm.base import BaseLLMProvider
 from app.rag.context_plan import GenerationPlan
 from app.rag.decision_tree import (
     GenerationDecision,
@@ -26,7 +27,6 @@ from app.tools.registry import tool_registry
 NO_CONTEXT_ANSWER = (
     "No encontré información suficiente en los documentos para responder esta pregunta."
 )
-NO_CONVERSATION_HISTORY = "(no proporcionado)"
 NO_RAG_CONTEXT = "(no aplica — consulta sin búsqueda documental)"
 
 # Respuesta unificada para solicitudes bloqueadas (sin LLM)
@@ -68,7 +68,7 @@ class ResponseGenerator:
                 "tokens_output": 0,
             }
 
-        prompt, context_text, history_text = self._build_prompt(
+        prompt, context_text, conversation_context = self._build_prompt(
             plan=plan,
             decision=decision,
             context_chunks=context_chunks,
@@ -78,7 +78,8 @@ class ResponseGenerator:
         logger.info(
             f"Árbol de decisión → {decision.path.value} | prompt={decision.prompt_family} | "
             f"intent={plan.intent.value} | contexto: {len(context_text)} chars | "
-            f"historial: {len(history_text)} chars | pregunta: '{plan.current_question}'"
+            f"conversación: {len(conversation_context)} chars | "
+            f"pregunta: '{plan.current_question}'"
         )
 
         tools_used = []
@@ -93,7 +94,7 @@ class ResponseGenerator:
                 llm_provider=self.client,
                 query=plan.current_question,
                 context_text=context_text,
-                conversation_history=history_text,
+                conversation_context=conversation_context,
                 working_memory=plan.working_memory.to_prompt_text(),
                 user_role=plan.user_role,
                 tool_mode=decision.tool_mode,
@@ -144,7 +145,7 @@ class ResponseGenerator:
             yield REJECTION_ANSWER
             return
 
-        prompt, context_text, history_text = self._build_prompt(
+        prompt, context_text, conversation_context = self._build_prompt(
             plan=plan,
             decision=decision,
             context_chunks=context_chunks,
@@ -160,7 +161,7 @@ class ResponseGenerator:
                 llm_provider=self.client,
                 query=plan.current_question,
                 context_text=context_text,
-                conversation_history=history_text,
+                conversation_context=conversation_context,
                 working_memory=plan.working_memory.to_prompt_text(),
                 user_role=plan.user_role,
                 tool_mode=decision.tool_mode,
@@ -192,7 +193,10 @@ class ResponseGenerator:
         fallback_context: str | None = None,
     ) -> tuple[str, str, str]:
         """Selecciona el prompt según GenerationPath (lo que consume el modelo)."""
-        history_text = plan.conversation_history.strip() or NO_CONVERSATION_HISTORY
+        conversation_context = format_conversation_context(
+            plan.summary,
+            plan.recent_messages,
+        )
         working_memory_text = plan.working_memory.to_prompt_text()
 
         if decision.path == GenerationPath.CONVERSATION:
@@ -201,10 +205,10 @@ class ResponseGenerator:
 
         if decision.path == GenerationPath.MEMORY:
             prompt = MEMORY_REQUEST_PROMPT.format(
-                conversation_history=history_text,
+                conversation_context=conversation_context,
                 question=plan.current_question,
             )
-            return prompt, NO_RAG_CONTEXT, history_text
+            return prompt, NO_RAG_CONTEXT, conversation_context
 
         if decision.path == GenerationPath.REJECTION:
             # Defensa: no debería llegar aquí (se intercepta antes).
@@ -214,10 +218,10 @@ class ResponseGenerator:
         if decision.path == GenerationPath.SCHEDULING_FALLBACK:
             prompt = SCHEDULING_FALLBACK_PROMPT.format(
                 working_memory=working_memory_text,
-                conversation_history=history_text,
+                conversation_context=conversation_context,
                 question=plan.current_question,
             )
-            return prompt, NO_RAG_CONTEXT, history_text
+            return prompt, NO_RAG_CONTEXT, conversation_context
 
         # SCHEDULING_TOOLS / AUTOMOTIVE_TOOLS / AUTOMOTIVE_RAG
         # El tool loop reconstruye TOOL_AUGMENTED; aquí armamos contexto + prompt RAG
@@ -228,22 +232,23 @@ class ResponseGenerator:
             GenerationPath.AUTOMOTIVE_TOOLS,
         }:
             # Contexto se inyecta en tool_loop; devolvemos texto para el loop.
-            return "", context_text, history_text
+            return "", context_text, conversation_context
 
         template = SUPABASE_RAG_PROMPT if supabase_configured() else RAG_SYSTEM_PROMPT
         prompt = template.format(
             working_memory=working_memory_text,
-            conversation_history=history_text,
+            conversation_context=conversation_context,
             context=context_text,
             question=plan.current_question,
         )
-        return prompt, context_text, history_text
+        return prompt, context_text, conversation_context
 
     def _build_context(
         self,
         chunks: list[dict],
         fallback_context: str | None = None,
     ) -> str:
+        """Contexto documental: nace de retrieval/rerank (chunks), no del GenerationPlan."""
         if not chunks:
             return fallback_context or NO_CONTEXT_ANSWER
 

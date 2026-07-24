@@ -206,7 +206,7 @@ docker run --rm -p 8000:8000 \
 
 - Performs a semantic search filtered by a 0.4 threshold setting (`TOP_K` candidates).
 - Runs a batch reranking pipeline via the LLM to filter down to the top 3 chunks.
-- Applies a highly restrictive system prompt (`app/core/prompts.py`) forcing the engine to reply _only_ using the matched context.
+- Applies a highly restrictive system prompt (`app/llm/prompts/rag_system.py`) forcing the engine to reply _only_ using the matched context.
 
 5. **Startup Handling** (`lifespan` in `main.py`): Pre-loads the embedding network, verifies Qdrant Cloud reachability, and warms up Ollama memory state (`num_predict: 1`).
 6. **Evaluation Module** (`app/evaluation/`): Evaluates $N$ validation queries through the pipeline to compute core performance metrics: Precision, Recall, Faithfulness, and Relevancy, generating an export at `data/processed/evaluation_report.json`.

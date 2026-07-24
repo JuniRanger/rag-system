@@ -1,6 +1,6 @@
 # Prompts del Agente (Tool Calling)
 
-Fuente: `app/core/prompts.py`  
+Fuente: `app/llm/prompts/`  
 Uso: `app/rag/tool_loop.py` → `_build_tool_prompt` cuando `plan.use_tools` y tools activas.
 
 Ver catálogo de tools: [../tools.md](../tools.md).  
@@ -8,7 +8,7 @@ Ver diagrama del loop: [../flows.md](../flows.md).
 
 ## TOOL_AUGMENTED_RAG_PROMPT
 
-* **Archivo:** `app/core/prompts.py`
+* **Archivo:** `app/llm/prompts/tool_augmented_rag.py`
 * **Propósito:** Prompt principal del agente con tools: diagnóstico +/o agendamiento (`crearCitaAPI`), con rol, modo de tools y perfil de usuario.
 * **Cuándo se utiliza:** `plan.use_tools == True` **y** `ENABLE_RAG_TOOLS` **y** hay tools registradas.
 * **Entradas:**
@@ -18,14 +18,14 @@ Ver diagrama del loop: [../flows.md](../flows.md).
   * `{user_profile}` — texto de `RAGUser.to_cita_prompt_text()`
   * `{tool_mode}` — `all` | `scheduling` | `none`
   * `{tool_mode_rules}` — fragmento correspondiente
-  * `{working_memory}`, `{conversation_history}`, `{context}`, `{question}`
+  * `{working_memory}`, `{conversation_context}`, `{context}`, `{question}`
 * **Salidas:** Prosa al usuario y/o **tool_calls** nativos (no JSON en texto). Tras tools, respuesta final en lenguaje natural.
 * **Dependencias:** Tool registry, `tool_executor`, inyección servidor de `usuario` en `crearCitaAPI`, filtrado de schemas por rol/modo.
 * **Observaciones:** En modo `scheduling`, el contexto documental se reemplaza por un placeholder fijo (“sin contexto documental — modo agendamiento”).
 
 ## TOOL_MODE_RULES_SCHEDULING / ALL / NONE
 
-* **Archivo:** `app/core/prompts.py`
+* **Archivo:** `app/llm/prompts/tool_mode_rules_scheduling.py`, `tool_mode_rules_all.py`, `tool_mode_rules_none.py`
 * **Propósito:** Fragmentos inyectados en `{tool_mode_rules}` según el modo del plan.
 * **Cuándo:** Siempre que se construye `TOOL_AUGMENTED_RAG_PROMPT`.
 * **Entradas:** Ninguna (texto estático).
@@ -38,7 +38,7 @@ Ver diagrama del loop: [../flows.md](../flows.md).
 
 ## ROLE_RULES_ADMIN / ROLE_RULES_CLIENT
 
-* **Archivo:** `app/core/prompts.py`
+* **Archivo:** `app/llm/prompts/role_rules_admin.py`, `role_rules_client.py`
 * **Propósito:** Restricciones por rol en el prompt de tools.
 * **Cuándo:** Prompt aumentado con tools.
 * **Dependencias:** `request.user.perfil.role` (default `client`).
@@ -47,7 +47,7 @@ Ver diagrama del loop: [../flows.md](../flows.md).
 
 ## TOOL_FINAL_USER_NUDGE
 
-* **Archivo:** `app/core/prompts.py`
+* **Archivo:** `app/llm/prompts/tool_final_user_nudge.py`
 * **Propósito:** Tras rondas de tools sin `content` final, se añade un mensaje `role=user` pidiendo respuesta en prosa y prohibiendo nuevas tool calls.
 * **Cuándo:** `needs_final_stream` y aún no hay `answer` en `_execute_tool_rounds`.
 * **Entradas:** N/A (string constante).

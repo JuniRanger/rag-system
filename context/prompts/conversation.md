@@ -1,11 +1,11 @@
 # Prompts Conversacionales y Fuera de Dominio
 
-Fuente: `app/core/prompts.py`  
+Fuente: `app/llm/prompts/`  
 Selección: `ResponseGenerator._build_prompt` según `QueryIntent`.
 
 ## CONVERSATION_PROMPT
 
-* **Archivo:** `app/core/prompts.py`
+* **Archivo:** `app/llm/prompts/conversation.py`
 * **Propósito:** Respuestas cortas y naturales sin diagnóstico ni documentos.
 * **Cuándo se utiliza:** `QueryIntent.CONVERSATION`.
 * **Entradas:** `{question}`.
@@ -16,18 +16,18 @@ Selección: `ResponseGenerator._build_prompt` según `QueryIntent`.
 
 ## MEMORY_REQUEST_PROMPT
 
-* **Archivo:** `app/core/prompts.py`
-* **Propósito:** Responder preguntas sobre lo hablado recientemente usando solo el historial.
+* **Archivo:** `app/llm/prompts/memory_request.py`
+* **Propósito:** Responder preguntas sobre la conversación previa usando solo `conversation_context`.
 * **Cuándo se utiliza:** `QueryIntent.MEMORY_REQUEST`.
-* **Entradas:** `{conversation_history}`, `{question}`.
-* **Salidas:** Respuesta factual sobre mensajes previos; sin diagnóstico.
-* **Dependencias:** `request.recent_messages` formateados en el plan (`include_history=True`).
-* **Flujo:** Intent memory → skip RAG → prompt con historial → LLM.
-* **Observaciones:** El **summary** pasivo **no** se inyecta en este prompt (solo `recent_messages`). Tests lo verifican (`test_memory_request_uses_history_not_summary_in_prompt`).
+* **Entradas:** `{conversation_context}`, `{question}`.
+* **Salidas:** Respuesta factual sobre lo hablado; sin diagnóstico ni RAG.
+* **Dependencias:** `format_conversation_context(plan.summary, plan.recent_messages)` en `ResponseGenerator._build_prompt`.
+* **Flujo:** Intent memory → skip RAG → prompt con `conversation_context` → LLM.
+* **Observaciones:** No usa `conversation_history`, working_memory ni chunks documentales. El contexto conversacional puede incluir resumen + mensajes recientes cuando `include_conversation_history=True`.
 
 ## OUT_OF_SCOPE_PROMPT
 
-* **Archivo:** `app/core/prompts.py`
+* **Archivo:** `app/llm/prompts/out_of_scope.py`
 * **Propósito:** Rechazar amablemente temas no automotrices vía LLM.
 * **Cuándo se utiliza:** En `_build_prompt` si `intent == OUT_OF_SCOPE`.
 * **Entradas:** `{question}`.

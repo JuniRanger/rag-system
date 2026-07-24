@@ -21,4 +21,4 @@
 2. [flows.md](./flows.md) + [intents.md](./intents.md)
 3. [prompts/README.md](./prompts/README.md)
 4. [tools.md](./tools.md)
-5. Código: `app/core/prompts.py` → `app/rag/context_plan.py` → `app/llm/generator.py` → `app/rag/tool_loop.py`
+5. Código: `app/llm/prompts/` → `app/rag/context_plan.py` → `app/llm/generator.py` → `app/rag/tool_loop.py`

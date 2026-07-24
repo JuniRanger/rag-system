@@ -1,22 +1,25 @@
 # Documentación de Prompts
 
-Todos los prompts / fragmentos de texto viven en **`app/core/prompts.py`**, salvo las **descripciones de tools** (schemas JSON) y **respuestas estáticas** sin LLM.
+Todos los prompts / fragmentos de texto viven en **`app/llm/prompts/`** (un módulo por plantilla), salvo las **descripciones de tools** (schemas JSON) y **respuestas estáticas** sin LLM.
 
 ## Índice
 
 | Prompt / Fragmento | Archivo código | Doc | Función |
 | ------------------ | -------------- | --- | ------- |
-| `RAG_SYSTEM_PROMPT` | `app/core/prompts.py` | [rag.md](./rag.md) | RAG sin tools (sin Supabase) |
-| `SUPABASE_RAG_PROMPT` | `app/core/prompts.py` | [rag.md](./rag.md) | RAG sin tools (con Supabase) |
-| `CONVERSATION_PROMPT` | `app/core/prompts.py` | [conversation.md](./conversation.md) | Charla breve |
-| `MEMORY_REQUEST_PROMPT` | `app/core/prompts.py` | [conversation.md](./conversation.md) | Preguntas sobre historial |
-| `OUT_OF_SCOPE_PROMPT` | `app/core/prompts.py` | [conversation.md](./conversation.md) | Fuera de dominio (legado; ver nota) |
-| `TOOL_AUGMENTED_RAG_PROMPT` | `app/core/prompts.py` | [agent.md](./agent.md) | Generación con function calling |
-| `TOOL_MODE_RULES_*` | `app/core/prompts.py` | [agent.md](./agent.md) | Reglas por `tool_mode` |
-| `ROLE_RULES_*` | `app/core/prompts.py` | [agent.md](./agent.md) | Reglas por rol |
-| `TOOL_FINAL_USER_NUDGE` | `app/core/prompts.py` | [agent.md](./agent.md) | Nudge post-tools |
-| `CONVERSATION_SUMMARY_PROMPT` | `app/core/prompts.py` | [summary.md](./summary.md) | Resumen pasivo |
+| `RAG_SYSTEM_PROMPT` | `app/llm/prompts/rag_system.py` | [rag.md](./rag.md) | RAG sin tools (sin Supabase) |
+| `SUPABASE_RAG_PROMPT` | `app/llm/prompts/supabase_rag.py` | [rag.md](./rag.md) | RAG sin tools (con Supabase) |
+| `CONVERSATION_PROMPT` | `app/llm/prompts/conversation.py` | [conversation.md](./conversation.md) | Charla breve |
+| `MEMORY_REQUEST_PROMPT` | `app/llm/prompts/memory_request.py` | [conversation.md](./conversation.md) | Preguntas sobre historial |
+| `OUT_OF_SCOPE_PROMPT` | `app/llm/prompts/out_of_scope.py` | [conversation.md](./conversation.md) | Fuera de dominio (legado; ver nota) |
+| `SCHEDULING_FALLBACK_PROMPT` | `app/llm/prompts/scheduling_fallback.py` | [conversation.md](./conversation.md) | Citas sin tools |
+| `TOOL_AUGMENTED_RAG_PROMPT` | `app/llm/prompts/tool_augmented_rag.py` | [agent.md](./agent.md) | Generación con function calling |
+| `TOOL_MODE_RULES_*` | `app/llm/prompts/tool_mode_rules_*.py` | [agent.md](./agent.md) | Reglas por `tool_mode` |
+| `ROLE_RULES_*` | `app/llm/prompts/role_rules_*.py` | [agent.md](./agent.md) | Reglas por rol |
+| `TOOL_FINAL_USER_NUDGE` | `app/llm/prompts/tool_final_user_nudge.py` | [agent.md](./agent.md) | Nudge post-tools |
+| `CONVERSATION_SUMMARY_PROMPT` | `app/llm/prompts/conversation_summary.py` | [summary.md](./summary.md) | Resumen pasivo |
 | Schemas de tools | `app/tools/schemas/*.py` | [../tools.md](../tools.md) | Instrucciones de function calling |
+
+Import: `from app.llm.prompts import ...` (vía `app/llm/prompts/__init__.py`).
 
 ## Respuestas fijas (no son prompts LLM)
 

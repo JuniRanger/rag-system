@@ -5,7 +5,7 @@ from datetime import date
 from typing import Any, Literal
 
 from app.core.logger import logger
-from app.core.prompts import (
+from app.llm.prompts import (
     ROLE_RULES_ADMIN,
     ROLE_RULES_CLIENT,
     TOOL_AUGMENTED_RAG_PROMPT,
@@ -84,14 +84,14 @@ def _build_tool_prompt(
     *,
     query: str,
     context_text: str,
-    conversation_history: str,
+    conversation_context: str,
     working_memory: str,
     user_role: str,
     tool_mode: str,
     user_profile: str = "(sin datos de usuario en el request)",
 ) -> tuple[str, str]:
     today_date = date.today().isoformat()
-    history_text = conversation_history.strip() or "(sin historial previo)"
+    conversation_text = (conversation_context or "").strip()
     memory_text = working_memory.strip() or "(sin contexto activo de diagnóstico)"
     profile_text = user_profile.strip() or "(sin datos de usuario en el request)"
     effective_context = (
@@ -107,7 +107,7 @@ def _build_tool_prompt(
         tool_mode=tool_mode,
         tool_mode_rules=_tool_mode_rules(tool_mode),
         working_memory=memory_text,
-        conversation_history=history_text,
+        conversation_context=conversation_text,
         context=effective_context,
         question=query,
     )
@@ -252,7 +252,7 @@ async def run_tool_augmented_generation(
     llm_provider: BaseLLMProvider,
     query: str,
     context_text: str,
-    conversation_history: str = "",
+    conversation_context: str = "",
     working_memory: str = "",
     user_role: Literal["admin", "client"] | str = "client",
     tool_mode: str = "all",
@@ -283,7 +283,7 @@ async def run_tool_augmented_generation(
     prompt, _ = _build_tool_prompt(
         query=query,
         context_text=context_text,
-        conversation_history=conversation_history,
+        conversation_context=conversation_context,
         working_memory=working_memory,
         user_role=user_role,
         tool_mode=tool_mode,
@@ -323,7 +323,7 @@ async def stream_tool_augmented_generation(
     llm_provider: BaseLLMProvider,
     query: str,
     context_text: str,
-    conversation_history: str = "",
+    conversation_context: str = "",
     working_memory: str = "",
     user_role: Literal["admin", "client"] | str = "client",
     tool_mode: str = "all",
@@ -367,7 +367,7 @@ async def stream_tool_augmented_generation(
     prompt, _ = _build_tool_prompt(
         query=query,
         context_text=context_text,
-        conversation_history=conversation_history,
+        conversation_context=conversation_context,
         working_memory=working_memory,
         user_role=user_role,
         tool_mode=tool_mode,

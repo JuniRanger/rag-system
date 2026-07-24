@@ -76,12 +76,14 @@ def test_conversation_skips_rag_and_history():
 
     assert plan.intent == QueryIntent.CONVERSATION
     assert plan.run_rag is False
-    assert plan.conversation_history == ""
+    assert plan.include_conversation_history is False
+    assert plan.summary == ""
+    assert plan.recent_messages == []
 
 
-def test_memory_request_uses_history_not_summary_in_prompt():
+def test_memory_request_keeps_structured_summary_and_messages():
     request = RAGRequest(
-        summary="Resumen que no debe ir al prompt.",
+        summary="Resumen pasivo de la sesión.",
         recent_messages=[
             ChatMessage(role="user", content="Pregunta anterior sobre frenos"),
             ChatMessage(role="assistant", content="Revisemos las balatas"),
@@ -92,13 +94,17 @@ def test_memory_request_uses_history_not_summary_in_prompt():
 
     assert plan.intent == QueryIntent.MEMORY_REQUEST
     assert plan.run_rag is False
-    assert "Pregunta anterior sobre frenos" in plan.conversation_history
-    assert "Resumen que no debe ir" not in plan.conversation_history
+    assert plan.include_conversation_history is True
+    assert plan.summary == "Resumen pasivo de la sesión."
+    assert plan.recent_messages[0].content == "Pregunta anterior sobre frenos"
 
 
 def test_automotive_retrieval_uses_working_memory_not_global_summary():
     request = RAGRequest(
         summary="Se discutió un Ford Focus en otra sesión.",
+        recent_messages=[
+            ChatMessage(role="user", content="Hablamos de un Ford"),
+        ],
         working_memory=WorkingMemory(vehicle="hyundai santa fe 2016", problem="fallo transmisión"),
         message=ChatMessage(
             role="user",
@@ -110,8 +116,10 @@ def test_automotive_retrieval_uses_working_memory_not_global_summary():
     assert plan.run_rag is True
     assert "hyundai santa fe 2016" in plan.retrieval_query
     assert "Ford Focus" not in plan.retrieval_query
-    assert plan.conversation_history == ""
-
+    # Sin referencia explícita → no incluir historial en el plan
+    assert plan.include_conversation_history is False
+    assert plan.summary == ""
+    assert plan.recent_messages == []
 
 def test_extract_vehicle_with_year():
     assert extract_vehicle("Hyundai Santa Fe 2016 con ruidos") == "hyundai santa fe 2016"
@@ -249,7 +257,8 @@ def test_generator_build_prompt_uses_conversation_path():
         prompt_family="CONVERSATION_PROMPT",
     )
     prompt, context, history = gen._build_prompt(plan, decision, [], None)
-    assert "asistente de mecánica" in prompt.lower() or "conversacional" in prompt.lower()
+    assert "modo: conversación general" in prompt.lower()
+    assert "hola" in prompt.lower()
     assert history == ""
     assert "no aplica" in context.lower() or context
 
@@ -277,3 +286,60 @@ def test_generator_build_prompt_scheduling_fallback():
     prompt, _, _ = gen._build_prompt(plan, decision, [], None)
     assert "agendamiento" in prompt.lower() or "cita" in prompt.lower()
     assert "YA fue clasificada" in prompt
+
+
+def test_format_conversation_context_includes_summary_and_messages():
+    from app.llm.conversation_format import format_conversation_context
+
+    text = format_conversation_context(
+        summary="Se habló de frenos.",
+        recent_messages=[
+            ChatMessage(role="user", content="¿Y las balatas?"),
+            ChatMessage(role="assistant", content="Revisemos el desgaste."),
+        ],
+    )
+    assert "RESUMEN DE LA CONVERSACIÓN" in text
+    assert "Se habló de frenos." in text
+    assert "MENSAJES RECIENTES" in text
+    assert "Usuario: ¿Y las balatas?" in text
+    assert "Asistente: Revisemos el desgaste." in text
+
+
+def test_format_conversation_context_omits_empty_sections():
+    from app.llm.conversation_format import format_conversation_context
+
+    assert format_conversation_context("", []) == ""
+    only_summary = format_conversation_context("Solo resumen", [])
+    assert "RESUMEN DE LA CONVERSACIÓN" in only_summary
+    assert "MENSAJES RECIENTES" not in only_summary
+
+
+def test_generator_memory_prompt_formats_structured_plan():
+    from app.llm.generator import ResponseGenerator
+    from app.rag.decision_tree import GenerationDecision
+
+    class _DummyLLM:
+        pass
+
+    gen = ResponseGenerator(llm_provider=_DummyLLM())
+    plan = plan_request(
+        RAGRequest(
+            summary="Resumen de frenos.",
+            recent_messages=[
+                ChatMessage(role="user", content="Pregunta anterior sobre frenos"),
+                ChatMessage(role="assistant", content="Revisemos las balatas"),
+            ],
+            message=ChatMessage(role="user", content="¿Qué acabamos de hablar?"),
+        )
+    )
+    decision = GenerationDecision(
+        path=GenerationPath.MEMORY,
+        call_llm=True,
+        use_tools=False,
+        tool_mode="none",
+        prompt_family="MEMORY_REQUEST_PROMPT",
+    )
+    prompt, _, conversation_context = gen._build_prompt(plan, decision, [], None)
+    assert "RESUMEN DE LA CONVERSACIÓN" in conversation_context
+    assert "Resumen de frenos." in prompt
+    assert "Usuario: Pregunta anterior sobre frenos" in prompt

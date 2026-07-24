@@ -26,7 +26,7 @@
 
 Este repositorio es un **RAG conversacional de mecánica automotriz** con:
 
-- **Un solo archivo central de prompts** (`app/core/prompts.py`).
+- **Paquete de prompts** (`app/llm/prompts/`, un módulo por plantilla).
 - Un **planificador heurístico** (`intent` + `context_plan`) que enruta a prompts ligeros, RAG estricto, o un **agente con function calling**.
 - **Memoria dual:** `working_memory` (activa, en prompts) y `summary` (pasiva, prompt aparte cada 3 turnos).
 - **Tools** opcionales de consulta Supabase + agendamiento de citas, gobernadas por `ENABLE_RAG_TOOLS`, rol y `tool_mode`.

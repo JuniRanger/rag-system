@@ -1,4 +1,4 @@
-from app.core.prompts import CONVERSATION_SUMMARY_PROMPT
+from app.llm.prompts import CONVERSATION_SUMMARY_PROMPT
 from app.core.logger import logger
 from app.llm.base import BaseLLMProvider
 from app.rag.schemas import ChatMessage, RAGRequest

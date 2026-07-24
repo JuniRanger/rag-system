@@ -28,18 +28,13 @@ class GenerationPlan:
     working_memory: WorkingMemory
     vehicle_changed: bool
     retrieval_query: str
-    conversation_history: str
+    summary: str
+    recent_messages: list[ChatMessage]
     current_question: str
     user_role: str = "client"
     # Texto + payload para que el LLM arme el DTO de crearCitaAPI
     user_profile_text: str = "(sin datos de usuario en el request)"
     cita_usuario: dict[str, str] | None = None
-
-
-def _format_recent_messages(messages: list[ChatMessage]) -> str:
-    if not messages:
-        return ""
-    return "\n".join(f"{message.role}: {message.content}" for message in messages)
 
 
 def _update_working_memory(
@@ -136,9 +131,13 @@ def plan_request(request: RAGRequest) -> GenerationPlan:
         )
         retrieval_query = _build_retrieval_query(working_memory, message) if run_rag else message
 
-    conversation_history = (
-        _format_recent_messages(request.recent_messages) if include_history else ""
-    )
+    # Estado estructurado: el Prompt Builder formatea a texto más tarde.
+    if include_history:
+        summary = request.summary or ""
+        recent_messages = list(request.recent_messages)
+    else:
+        summary = ""
+        recent_messages = []
 
     user_profile_text = "(sin datos de usuario en el request)"
     cita_usuario = None
@@ -150,6 +149,8 @@ def plan_request(request: RAGRequest) -> GenerationPlan:
         f"Plan generado | intent={intent.value} | run_rag={run_rag} | "
         f"use_tools={use_tools} | tool_mode={tool_mode} | "
         f"vehicle_changed={vehicle_changed} | include_history={include_history} | "
+        f"summary={'sí' if summary.strip() else 'no'} | "
+        f"recent_messages={len(recent_messages)} | "
         f"working_vehicle={working_memory.vehicle or '—'} | role={request.user_role()} | "
         f"cita_usuario={'ok' if cita_usuario else 'incompleto/ausente'}"
     )
@@ -163,7 +164,8 @@ def plan_request(request: RAGRequest) -> GenerationPlan:
         working_memory=working_memory,
         vehicle_changed=vehicle_changed,
         retrieval_query=retrieval_query,
-        conversation_history=conversation_history,
+        summary=summary,
+        recent_messages=recent_messages,
         current_question=current_question,
         user_role=request.user_role(),
         user_profile_text=user_profile_text,
