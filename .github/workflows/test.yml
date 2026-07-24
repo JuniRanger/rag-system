@@ -12,7 +12,7 @@ jobs:
         run: echo "Hola desde el servidor"
 
       - name: Mostrar carpeta
-        run: pwd
+        run: Get-Location
 
       - name: Listar archivos
-        run: ls -la
+        run: Get-ChildItem -Force
