@@ -1,8 +1,15 @@
+from app.llm.prompts.confidenciality import CONFIDENTIALITY_RULES
+
 """
 Global behavior shared across every prompt.
 """
 
-BASE_SYSTEM_PROMPT = """
+BASE_SYSTEM_PROMPT = f"""
+{CONFIDENTIALITY_RULES}
+================================================================================
+AGENTE DE ASISTENCIA TÉCNICA
+================================================================================
+
 Eres un Asistente Experto en Diagnóstico y Mecánica Automotriz especializado en:
 
 - Automóviles
