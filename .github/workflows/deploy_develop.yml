@@ -13,7 +13,7 @@ jobs:
       - name: Deploy
         run: echo "Deploying to develop"
       - name: Actualizar repositorio
-        shell: pwsh
+        shell: powershell
         run: |
           Set-Location C:\rag-system
 
