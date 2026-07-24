@@ -1,0 +1,21 @@
+name: Test Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: self-hosted
+
+    steps:
+      - name: Hola
+        run: echo "Hola desde el servidor"
+
+      - name: Mostrar SO
+        run: uname -a
+
+      - name: Mostrar carpeta
+        run: pwd
+
+      - name: Listar archivos
+        run: ls -la
