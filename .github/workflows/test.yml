@@ -11,9 +11,6 @@ jobs:
       - name: Hola
         run: echo "Hola desde el servidor"
 
-      - name: Mostrar SO
-        run: uname -a
-
       - name: Mostrar carpeta
         run: pwd
 
