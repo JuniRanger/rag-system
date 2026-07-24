@@ -192,6 +192,7 @@ async def query_rag_stream(request: RAGRequest):
     """
     Consulta conversacional con streaming SSE.
     Eventos: token (fragmentos de respuesta), done (respuesta final + summary + metadata).
+    Con tools activas: las rondas de function calling corren antes; luego se streamea la respuesta final.
     """
     logger.info(
         f"Request de consulta stream | conversation_id={request.conversation_id} | "

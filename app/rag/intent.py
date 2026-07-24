@@ -7,8 +7,13 @@ from app.rag.schemas import WorkingMemory
 class QueryIntent(str, Enum):
     CONVERSATION = "conversation"
     AUTOMOTIVE = "automotive"
+    SCHEDULING = "scheduling"
     MEMORY_REQUEST = "memory_request"
     OUT_OF_SCOPE = "out_of_scope"
+
+
+# plan_request sustituye current_question; ResponseGenerator responde sin LLM.
+REJECT_OUT_OF_SCOPE_REQUEST = "REJECT_OUT_OF_SCOPE_REQUEST"
 
 
 _CONVERSATION_RE = re.compile(
@@ -46,11 +51,18 @@ _OUT_OF_SCOPE_RE = re.compile(
     re.IGNORECASE,
 )
 
+_SCHEDULING_RE = re.compile(
+    r"\b(?:cita|citas|agendar|agenda|agendemos|agéndame|agendame"
+    r"|reservar|reserva|turno|turnos|programar (?:una )?cita"
+    r"|quiero (?:una )?cita|necesito (?:una )?cita)\b",
+    re.IGNORECASE,
+)
+
 _AUTOMOTIVE_RE = re.compile(
     r"\b(?:motor|transmisión|transmision|caja de cambios|embrague|freno|balata|pastilla"
     r"|batería|bateria|alternador|inyector|turbo|ecu|obd|dtc|falla|fallo|ruido|vibración|vibracion"
     r"|mantenimiento|refacción|refaccion|diagnóstico|diagnostico|reparación|reparacion|taller"
-    r"|aceite|refrigerante|suspensión|suspension|dirección|direccion|escape|mofle|cilindro"
+    r"|servicio|aceite|refrigerante|suspensión|suspension|dirección|direccion|escape|mofle|cilindro"
     r"|hyundai|tesla|toyota|honda|ford|chevrolet|nissan|bmw|audi|mercedes|volkswagen|kia|mazda"
     r"|santa fe|model s|corolla|civic|camioneta|sedán|sedan|suv|pickup|motocicleta|moto)\b",
     re.IGNORECASE,
@@ -61,6 +73,10 @@ def has_explicit_reference(message: str) -> bool:
     return bool(_EXPLICIT_REFERENCE_RE.search(message))
 
 
+def is_scheduling_request(message: str) -> bool:
+    return bool(_SCHEDULING_RE.search(message))
+
+
 def detect_intent(message: str, working_memory: WorkingMemory) -> QueryIntent:
     text = message.strip()
     if not text:
@@ -68,6 +84,10 @@ def detect_intent(message: str, working_memory: WorkingMemory) -> QueryIntent:
 
     if _MEMORY_RE.search(text):
         return QueryIntent.MEMORY_REQUEST
+
+    # Agendar cita tiene prioridad sobre diagnóstico documental
+    if is_scheduling_request(text):
+        return QueryIntent.SCHEDULING
 
     if _CONVERSATION_RE.search(text) and not _AUTOMOTIVE_RE.search(text):
         return QueryIntent.CONVERSATION

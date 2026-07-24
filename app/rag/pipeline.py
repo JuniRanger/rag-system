@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator
 from app.rag.chain import RAGChain
 from app.rag.context_plan import GenerationPlan
 from app.rag.context_plan import plan_request
-from app.rag.exceptions import StreamingNotSupportedError
 from app.rag.mappers import build_function_calls, build_source_references, error_response, estimate_tokens
 from app.rag.memory import ConversationSummarizer, should_refresh_summary
 from app.rag.schemas import RAGRequest, RAGResponse, RAGResponseMetadata
@@ -13,7 +12,6 @@ from app.rag.sse import format_sse_event
 from app.core.logger import logger
 from app.embeddings.base import BaseEmbeddingProvider
 from app.llm.base import BaseLLMProvider
-from app.llm.generator import uses_tool_augmented_generation
 from app.retrieval.reranker import Reranker
 from app.vectorstore.base import BaseVectorStoreProvider
 
@@ -158,19 +156,6 @@ class RAGPipeline:
             )
             return
 
-        if uses_tool_augmented_generation():
-            yield format_sse_event(
-                "done",
-                error_response(
-                    conversation_id,
-                    "El streaming no está disponible cuando hay herramientas Supabase activas. "
-                    "Usa POST /query en su lugar.",
-                    summary=request.summary,
-                    working_memory=request.working_memory,
-                ).model_dump(),
-            )
-            return
-
         try:
             plan = plan_request(request)
             if plan.run_rag:
@@ -180,17 +165,23 @@ class RAGPipeline:
 
             answer_parts: list[str] = []
             first_token_at: float | None = None
+            stream_meta: dict = {}
 
-            async for token in self.chain.stream_generation(plan, context):
+            async for item in self.chain.stream_generation(plan, context):
+                if isinstance(item, dict) and "_meta" in item:
+                    stream_meta = item["_meta"]
+                    continue
+                token = item if isinstance(item, str) else str(item)
                 if first_token_at is None:
                     first_token_at = time.perf_counter()
                 answer_parts.append(token)
                 yield format_sse_event("token", {"content": token})
 
             finished_at = time.perf_counter()
-            answer = "".join(answer_parts)
+            answer = stream_meta.get("answer") or "".join(answer_parts)
             summary = await self._resolve_summary(request, answer)
-            tokens_output = estimate_tokens(answer)
+            tokens_output = stream_meta.get("tokens_output") or estimate_tokens(answer)
+            tokens_input = stream_meta.get("tokens_input") or estimate_tokens(query)
             ttft_ms, latency_ms, tokens_per_second = _compute_stream_metrics(
                 started_at,
                 first_token_at,
@@ -203,8 +194,9 @@ class RAGPipeline:
                 "chunks_retrieved": context["chunks_retrieved"],
                 "chunks_used": context["chunks_used"],
                 "context_used": context["chunks"] if plan.run_rag else [],
-                "tokens_input": estimate_tokens(query),
+                "tokens_input": tokens_input,
                 "tokens_output": tokens_output,
+                "tools_used": stream_meta.get("tools_used", []),
             }
 
             yield format_sse_event(
@@ -223,16 +215,6 @@ class RAGPipeline:
                         ttft_ms=ttft_ms,
                         tokens_per_second=tokens_per_second,
                     ),
-                ).model_dump(),
-            )
-        except StreamingNotSupportedError as error:
-            yield format_sse_event(
-                "done",
-                error_response(
-                    conversation_id,
-                    str(error),
-                    summary=request.summary,
-                    working_memory=request.working_memory,
                 ).model_dump(),
             )
         except Exception as error:

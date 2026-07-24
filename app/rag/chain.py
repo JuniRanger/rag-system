@@ -74,13 +74,13 @@ class RAGChain:
         self,
         plan: GenerationPlan,
         context: dict,
-    ) -> AsyncIterator[str]:
-        async for token in self.generator.stream_generate(
+    ) -> AsyncIterator[str | dict]:
+        async for item in self.generator.stream_generate(
             plan=plan,
             context_chunks=context["chunks"],
             fallback_context=context["context_str"],
         ):
-            yield token
+            yield item
 
     async def retrieve_context(self, request: RAGRequest, plan: GenerationPlan) -> dict:
         options = request.options

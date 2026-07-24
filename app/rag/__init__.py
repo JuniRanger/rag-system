@@ -5,7 +5,10 @@ from app.rag.schemas import (
     RAGRequest,
     RAGResponse,
     RAGResponseMetadata,
+    RAGUser,
     SourceReference,
+    UserPerfil,
+    UsuarioInfo,
     WorkingMemory,
 )
 
@@ -16,6 +19,9 @@ __all__ = [
     "RAGRequest",
     "RAGResponse",
     "RAGResponseMetadata",
+    "RAGUser",
     "SourceReference",
+    "UserPerfil",
+    "UsuarioInfo",
     "WorkingMemory",
 ]

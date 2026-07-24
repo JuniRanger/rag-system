@@ -30,22 +30,22 @@ def test_model_candidates_order():
 
 
 def test_find_installed_model_matches_tag_variants():
-    available = ["llama3:8b", "llama3.2:1b"]
-    assert _find_installed_model("llama3:8b", available) == "llama3:8b"
+    available = ["llama3.2:latest", "llama3.2:1b"]
+    assert _find_installed_model("llama3.2:latest", available) == "llama3.2:latest"
 
 
 def test_resolve_ollama_model_uses_configured_when_available():
     client = MagicMock()
-    client.list.return_value = {"models": [{"name": "llama3:8b"}]}
+    client.list.return_value = {"models": [{"name": "llama3.2:latest"}]}
 
     with patch("app.llm.model_config.settings") as mock_settings:
-        mock_settings.OLLAMA_MODEL = "llama3:8b"
+        mock_settings.OLLAMA_MODEL = "llama3.2:latest"
         mock_settings.OLLAMA_MODEL_FALLBACK = DEFAULT_OLLAMA_MODEL_FALLBACK
         mock_settings.OLLAMA_BASE_URL = "http://localhost:11434"
         mock_settings.ollama_base_url = "http://localhost:11434"
         reset_ollama_model_state()
 
-        assert resolve_ollama_model(client) == "llama3:8b"
+        assert resolve_ollama_model(client) == "llama3.2:latest"
         assert is_ollama_model_verified() is True
 
 
@@ -69,13 +69,13 @@ def test_resolve_ollama_model_returns_unverified_on_connection_error():
     client.list.side_effect = httpx.ConnectError("Connection refused")
 
     with patch("app.llm.model_config.settings") as mock_settings:
-        mock_settings.OLLAMA_MODEL = "llama3:8b"
+        mock_settings.OLLAMA_MODEL = "llama3.2:latest"
         mock_settings.OLLAMA_MODEL_FALLBACK = DEFAULT_OLLAMA_MODEL_FALLBACK
         mock_settings.OLLAMA_BASE_URL = "http://host.docker.internal:11434"
         mock_settings.ollama_base_url = "http://host.docker.internal:11434"
         reset_ollama_model_state()
 
-        assert resolve_ollama_model(client) == "llama3:8b"
+        assert resolve_ollama_model(client) == "llama3.2:latest"
         assert is_ollama_model_verified() is False
 
 
@@ -96,16 +96,16 @@ def test_resolve_ollama_model_raises_when_none_available():
 
 def test_get_active_ollama_model_is_cached():
     client = MagicMock()
-    client.list.return_value = {"models": [{"name": "llama3:8b"}]}
+    client.list.return_value = {"models": [{"name": "llama3.2:latest"}]}
 
     with patch("app.llm.model_config.settings") as mock_settings:
-        mock_settings.OLLAMA_MODEL = "llama3:8b"
+        mock_settings.OLLAMA_MODEL = "llama3.2:latest"
         mock_settings.OLLAMA_MODEL_FALLBACK = DEFAULT_OLLAMA_MODEL_FALLBACK
         mock_settings.OLLAMA_BASE_URL = "http://localhost:11434"
         mock_settings.ollama_base_url = "http://localhost:11434"
         reset_ollama_model_state()
 
         with patch("app.llm.model_config.get_ollama_client", return_value=client):
-            assert get_active_ollama_model() == "llama3:8b"
-            assert get_active_ollama_model() == "llama3:8b"
+            assert get_active_ollama_model() == "llama3.2:latest"
+            assert get_active_ollama_model() == "llama3.2:latest"
             client.list.assert_called_once()

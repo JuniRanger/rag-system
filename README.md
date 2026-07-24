@@ -65,7 +65,7 @@ Typical configuration values in `.env`:
 
 ```env
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3:8b
+OLLAMA_MODEL=llama3.2:latest
 OLLAMA_KEEP_ALIVE=24h
 
 # Qdrant Cloud (required) — from the Qdrant Cloud console

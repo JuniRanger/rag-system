@@ -63,8 +63,11 @@ class Settings(BaseSettings):
     SUPABASE_WEBHOOK_SECRET: str = ""
     SUPABASE_SYNC_SECRET: str = ""
     # Tool calling en generación RAG (independiente de webhook/sync).
-    # False → streaming habilitado; True → /query usa herramientas Supabase, /query/stream no.
-    ENABLE_RAG_TOOLS: bool = False
+    # True → function calling en /query y /query/stream (rondas de tools + stream de la respuesta final).
+    ENABLE_RAG_TOOLS: bool = True
+
+    # --- API de citas (crearCitaAPI) ---
+    CITAS_API_BASE_URL: str = "https://lacasadelosfrenos-api.onrender.com"
 
     # --- Rutas de datos ---
     RAW_DATA_PATH: str = "data/raw"

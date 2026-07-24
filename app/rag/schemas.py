@@ -1,7 +1,7 @@
 from typing import Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ChatMessage(BaseModel):
@@ -18,6 +18,74 @@ class RAGQueryOptions(BaseModel):
     use_reranker: bool = True
     top_k: int = Field(default=10, ge=1, le=50)
     max_chunks: int = Field(default=10, ge=1, le=20)
+
+
+class UserPerfil(BaseModel):
+    """Perfil del usuario (ragPayload.user.perfil)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    role: Literal["admin", "client"] = "client"
+
+
+class UsuarioInfo(BaseModel):
+    """Datos de cuenta del usuario (ragPayload.user.usuario)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    nombre: Optional[str] = None
+    email: Optional[str] = None
+    correo: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+class RAGUser(BaseModel):
+    """Contexto de usuario enviado por el frontend (ragPayload.user)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: Optional[str] = None
+    perfil: UserPerfil = Field(default_factory=UserPerfil)
+    usuario: Optional[UsuarioInfo] = None
+
+    def cita_usuario_payload(self) -> dict[str, str] | None:
+        """DTO de usuario para crearCitaAPI (id, nombre, correo)."""
+        user_id = str(self.id or "").strip()
+        info = self.usuario
+        nombre = str((info.nombre if info else None) or "").strip()
+        correo = ""
+        if info:
+            correo = str(info.correo or info.email or "").strip()
+        if not user_id or not nombre or not correo:
+            return None
+        return {"id": user_id, "nombre": nombre, "correo": correo}
+
+    def to_cita_prompt_text(self) -> str:
+        """Bloque legible de cliente en sesión (el servidor adjunta usuario a la tool)."""
+        payload = self.cita_usuario_payload()
+        if payload:
+            return (
+                f"id: {payload['id']}\n"
+                f"nombre: {payload['nombre']}\n"
+                f"correo: {payload['correo']}\n"
+                "(el sistema adjunta estos datos automáticamente al agendar)"
+            )
+
+        info = self.usuario
+        lines = [
+            f"id: {self.id or '(faltante)'}",
+        ]
+        if info:
+            lines.append(f"nombre: {info.nombre or '(faltante)'}")
+            correo = info.correo or info.email
+            lines.append(f"correo: {correo or '(faltante)'}")
+        else:
+            lines.append("nombre: (faltante)")
+            lines.append("correo: (faltante)")
+        lines.append(
+            "(datos incompletos: no se podrá agendar hasta que el request traiga id, nombre y correo)"
+        )
+        return "\n".join(lines)
 
 
 class WorkingMemory(BaseModel):
@@ -54,25 +122,34 @@ class RAGRequest(BaseModel):
     )
     message: ChatMessage
     options: RAGQueryOptions = Field(default_factory=RAGQueryOptions)
+    user: Optional[RAGUser] = Field(
+        default=None,
+        description="Usuario del frontend: id, perfil.role y usuario.",
+    )
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-                "summary": "Usuario consulta problemas mecánicos Hyundai.",
+                "summary": "Cliente quiere agendar cambio de balatas.",
                 "recent_messages": [
-                    {"role": "user", "content": "Tengo problemas de transmisión"},
-                    {"role": "assistant", "content": "¿Qué vehículo tienes?"},
+                    {"role": "user", "content": "Quiero agendar una cita"},
+                    {"role": "assistant", "content": "Claro, ¿qué vehículo y servicio necesitas?"},
                 ],
                 "message": {
                     "role": "user",
-                    "content": "¿Hay reportes para un Hyundai Santa Fe 2016?",
+                    "content": "Mazda 3 2018, balatas delanteras, este jueves a las 10:00",
                 },
-                "options": {
-                    "use_reranker": True,
-                    "top_k": 10,
-                    "max_chunks": 10,
+                "user": {
+                    "id": "1",
+                    "perfil": {"role": "client"},
+                    "usuario": {
+                        "nombre": "Cliente Guapo",
+                        "correo": "levos@gmail.com",
+                        "email": "levos@gmail.com",
+                    },
                 },
+                "options": {"use_reranker": True},
             }
         }
     }
@@ -82,6 +159,11 @@ class RAGRequest(BaseModel):
 
     def effective_query(self) -> str:
         return self.message.content.strip()
+
+    def user_role(self) -> Literal["admin", "client"]:
+        if self.user and self.user.perfil:
+            return self.user.perfil.role
+        return "client"
 
     def current_user_message_index(self) -> int:
         if self.user_message_count is not None:
