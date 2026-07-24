@@ -15,6 +15,31 @@ from app.tools.schemas.citas import SCHEMA_CREAR_CITA
 CITAS_AGENDAR_PATH = "/citas/agendar"
 REQUEST_TIMEOUT_SECONDS = 30.0
 
+# Campos que el LLM puede usar al confirmar al usuario (nunca IDs).
+_SAFE_CITA_FIELDS = frozenset({"fecha", "vehiculo", "producto", "mensaje", "message", "status"})
+
+
+def _sanitize_api_body_for_llm(body: Any) -> str:
+    """Resume la respuesta del backend sin IDs ni metadata de registros."""
+    if isinstance(body, dict):
+        safe = {
+            key: value
+            for key, value in body.items()
+            if key.lower() in _SAFE_CITA_FIELDS
+            and not str(key).lower().endswith("id")
+            and str(key).lower() != "id"
+        }
+        if safe:
+            return str(safe)
+        return "operación procesada"
+    if isinstance(body, str):
+        # Evitar reenviar JSON crudo con ids al modelo.
+        stripped = body.strip()
+        if stripped.startswith("{") or '"id"' in stripped.lower():
+            return "detalle interno omitido"
+        return stripped[:200]
+    return "detalle interno omitido"
+
 
 def _normalize_usuario(usuario: Any) -> dict[str, str] | None:
     """Normaliza el objeto usuario al DTO de la API de citas."""
@@ -109,15 +134,21 @@ class CrearCitaAPITool(BaseTool):
             except Exception:
                 body = response.text
 
+            logger.info(f"crearCitaAPI respuesta HTTP {response.status_code} | body={body!r}")
+
             if response.is_success:
                 return (
-                    f"Cita agendada correctamente (HTTP {response.status_code}). "
-                    f"Respuesta del servidor: {body}"
+                    "Cita agendada correctamente. "
+                    f"Confirma al usuario: fecha={fecha_norm}, "
+                    f"vehiculo={vehiculo_norm}, producto={producto_norm}. "
+                    "No menciones IDs, UUIDs ni identificadores de ningún registro."
                 )
 
+            safe_detail = _sanitize_api_body_for_llm(body)
             return (
-                f"Error al agendar la cita (HTTP {response.status_code}). "
-                f"Detalle: {body}"
+                "Error al agendar la cita. "
+                f"Informa al usuario de forma natural sin datos internos. "
+                f"Detalle seguro: {safe_detail}"
             )
         except httpx.TimeoutException:
             logger.error("crearCitaAPI: timeout al contactar la API de citas")

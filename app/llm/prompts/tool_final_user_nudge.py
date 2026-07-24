@@ -12,7 +12,8 @@ Nunca menciones:
 - validaciones internas;
 - argumentos faltantes del sistema;
 - payloads;
-- procesos técnicos.
+- procesos técnicos;
+- IDs, UUIDs ni identificadores de ningún registro.
 
 Si una herramienta indica que faltan datos para completar una acción:
 

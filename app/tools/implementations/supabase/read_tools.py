@@ -30,7 +30,6 @@ def _format_rows(rows: list[dict], header: str) -> str:
 
     lines = [header, f"Total: {len(rows)} registro(s)."]
     for index, row in enumerate(rows, 1):
-        record_id = row.get("id", "N/A")
         summary_parts = []
         for key in (
             "vehiculo_marca",
@@ -45,8 +44,17 @@ def _format_rows(rows: list[dict], header: str) -> str:
             value = row.get(key)
             if value not in (None, ""):
                 summary_parts.append(f"{key}: {value}")
-        lines.append(f"\n[{index}] id={record_id}")
-        lines.extend(summary_parts or [json.dumps(row, ensure_ascii=False, default=str)])
+        lines.append(f"\n[{index}]")
+        if summary_parts:
+            lines.extend(summary_parts)
+        else:
+            # Sin volcar id ni claves internas crudas.
+            safe_row = {
+                k: v
+                for k, v in row.items()
+                if str(k).lower() != "id" and not str(k).lower().endswith("_id")
+            }
+            lines.append(json.dumps(safe_row, ensure_ascii=False, default=str))
     return "\n".join(lines)
 
 
@@ -125,10 +133,10 @@ class ObtenerDatosEcuTool(BaseTool):
         )
         rows = response.data or []
         if not rows:
-            return f"No se encontró el registro con id={record_id}."
+            return "No se encontró el registro solicitado."
         row = rows[0]
         return (
-            f"ECU del registro {record_id} "
+            f"Datos ECU "
             f"({row.get('vehiculo_marca')} {row.get('vehiculo_modelo')}):\n"
             f"{row.get('ecu_data', 'Sin datos ECU')}"
         )
@@ -166,10 +174,10 @@ class ObtenerSolucionRapidaTool(BaseTool):
         )
         rows = response.data or []
         if not rows:
-            return f"No se encontró el registro con id={record_id}."
+            return "No se encontró el registro solicitado."
         row = rows[0]
         return (
-            f"Resumen rápido id={record_id} "
+            f"Resumen rápido "
             f"({row.get('vehiculo_marca')} {row.get('vehiculo_modelo')}):\n"
             f"Problema: {row.get('problema', 'N/A')}\n"
             f"Diagnóstico: {row.get('diagnostico', 'N/A')}\n"
@@ -222,7 +230,7 @@ class VerificarExistenciaVehiculoTool(BaseTool):
         )
         exists = bool(response.data)
         if exists:
-            return f"El vehículo {marca} {modelo} ya tiene historial en el sistema (id={response.data[0]['id']})."
+            return f"El vehículo {marca} {modelo} ya tiene historial en el sistema."
         return f"No hay registros previos para {marca} {modelo}."
 
 
