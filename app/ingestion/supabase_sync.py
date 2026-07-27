@@ -6,6 +6,7 @@ from typing import Any, Literal
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.providers import get_embedding_provider, get_vector_store_provider
+from app.core.sanitize import sanitize_identifier
 from app.core.supabase import get_supabase_client, require_supabase_config
 from app.ingestion.loaders.supabase_loader import SupabaseLoader
 from app.ingestion.pipeline import IngestionPipeline
@@ -136,11 +137,15 @@ class SupabaseSyncService:
         }
 
     def _build_loader(self, table: str | None = None) -> SupabaseLoader:
-        resolved_table = table or settings.SUPABASE_TABLE
+        resolved_table = sanitize_identifier(
+            table or settings.SUPABASE_TABLE,
+            field="table",
+        )
         return SupabaseLoader(self.client, resolved_table)
 
     def _state_path(self, table: str) -> Path:
-        return Path(settings.PROCESSED_DATA_PATH) / f"supabase_sync_{table}.json"
+        safe_table = sanitize_identifier(table, field="table")
+        return Path(settings.PROCESSED_DATA_PATH) / f"supabase_sync_{safe_table}.json"
 
     def _load_state(self, table: str) -> dict:
         path = self._state_path(table)

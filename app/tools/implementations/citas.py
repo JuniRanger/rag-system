@@ -8,6 +8,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.sanitize import SanitizeError, sanitize_cita_fecha, sanitize_text
 from app.tools.base import BaseTool
 from app.tools.registry import tool_registry
 from app.tools.schemas.citas import SCHEMA_CREAR_CITA
@@ -46,11 +47,15 @@ def _normalize_usuario(usuario: Any) -> dict[str, str] | None:
     if not isinstance(usuario, dict):
         return None
 
-    user_id = str(usuario.get("id") or "").strip()
-    nombre = str(usuario.get("nombre") or "").strip()
-    correo = str(usuario.get("correo") or usuario.get("email") or "").strip()
-
-    if not user_id or not nombre or not correo:
+    try:
+        user_id = sanitize_text(usuario.get("id"), field="usuario.id", max_length=128)
+        nombre = sanitize_text(usuario.get("nombre"), field="usuario.nombre", max_length=120)
+        correo = sanitize_text(
+            usuario.get("correo") or usuario.get("email"),
+            field="usuario.correo",
+            max_length=254,
+        )
+    except SanitizeError:
         return None
 
     return {
@@ -102,11 +107,12 @@ class CrearCitaAPITool(BaseTool):
                 "No se puede agendar la cita."
             )
 
-        fecha_norm = (fecha or "").strip()
-        vehiculo_norm = (vehiculo or "").strip()
-        producto_norm = (producto or "").strip()
-        if not fecha_norm or not vehiculo_norm or not producto_norm:
-            return "Error: fecha, vehiculo y producto son obligatorios."
+        try:
+            fecha_norm = sanitize_cita_fecha(fecha)
+            vehiculo_norm = sanitize_text(vehiculo, field="vehiculo", max_length=120)
+            producto_norm = sanitize_text(producto, field="producto", max_length=120)
+        except SanitizeError as error:
+            return f"Error: {error}"
 
         url = f"{base_url}{CITAS_AGENDAR_PATH}"
         payload = {

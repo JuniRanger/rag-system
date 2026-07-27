@@ -3,15 +3,17 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.sanitize import DEFAULT_QUERY_MAX_LEN, sanitize_text
+
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system", "tool"]
-    content: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1, max_length=DEFAULT_QUERY_MAX_LEN)
 
     @field_validator("content")
     @classmethod
     def strip_content(cls, value: str) -> str:
-        return value.strip()
+        return sanitize_text(value, field="content", max_length=DEFAULT_QUERY_MAX_LEN)
 
 
 class RAGQueryOptions(BaseModel):
