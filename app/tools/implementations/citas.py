@@ -4,17 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-import httpx
-
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.sanitize import SanitizeError, sanitize_cita_fecha, sanitize_text
+from app.services.api_client import InternalApiError, get_api_client
 from app.tools.base import BaseTool
 from app.tools.registry import tool_registry
 from app.tools.schemas.citas import SCHEMA_CREAR_CITA
 
 CITAS_AGENDAR_PATH = "/citas/agendar"
-REQUEST_TIMEOUT_SECONDS = 30.0
 
 # Campos que el LLM puede usar al confirmar al usuario (nunca IDs).
 _SAFE_CITA_FIELDS = frozenset({"fecha", "vehiculo", "producto", "mensaje", "message", "status"})
@@ -69,7 +67,7 @@ class CrearCitaAPITool(BaseTool):
     def __init__(self) -> None:
         super().__init__(SCHEMA_CREAR_CITA)
 
-    def run(
+    async def run(
         self,
         fecha: str,
         vehiculo: str,
@@ -114,7 +112,6 @@ class CrearCitaAPITool(BaseTool):
         except SanitizeError as error:
             return f"Error: {error}"
 
-        url = f"{base_url}{CITAS_AGENDAR_PATH}"
         payload = {
             "fecha": fecha_norm,
             "vehiculo": vehiculo_norm,
@@ -128,19 +125,19 @@ class CrearCitaAPITool(BaseTool):
             f"vehiculo={payload['vehiculo']!r}\n"
             f"producto={payload['producto']!r}\n"
             f"usuario={payload['usuario']!r}\n"
-            f"POST {url}"
+            f"POST {base_url}{CITAS_AGENDAR_PATH}"
         )
 
         try:
-            with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
-                response = client.post(url, json=payload)
+            api_client = get_api_client(base_url=base_url)
+            response = await api_client.post(CITAS_AGENDAR_PATH, json=payload)
 
             try:
                 body = response.json()
             except Exception:
                 body = response.text
 
-            logger.info(f"crearCitaAPI respuesta HTTP {response.status_code} | body={body!r}")
+            logger.info(f"crearCitaAPI respuesta HTTP {response.status_code}")
 
             if response.is_success:
                 return (
@@ -156,12 +153,12 @@ class CrearCitaAPITool(BaseTool):
                 f"Informa al usuario de forma natural sin datos internos. "
                 f"Detalle seguro: {safe_detail}"
             )
-        except httpx.TimeoutException:
-            logger.error("crearCitaAPI: timeout al contactar la API de citas")
-            return "Error: la API de citas no respondió a tiempo. Intenta de nuevo."
-        except httpx.HTTPError as error:
-            logger.error(f"crearCitaAPI: error HTTP {error}")
-            return f"Error de red al agendar la cita: {error}"
+        except InternalApiError as error:
+            logger.error(
+                f"crearCitaAPI: {error.error_type}"
+                + (f" status={error.status_code}" if error.status_code else "")
+            )
+            return f"Error: {error}"
 
 
 def register_cita_tools() -> None:

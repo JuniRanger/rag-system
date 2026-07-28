@@ -180,9 +180,11 @@ def test_register_read_tools_exposes_ollama_schemas(registered_tools):
 
 
 def test_executor_buscar_por_vehiculo(registered_tools):
-    result = tool_executor.execute(
-        "buscar_por_vehiculo",
-        {"marca": "Hyundai", "modelo": "Santa Fe"},
+    result = asyncio.run(
+        tool_executor.execute(
+            "buscar_por_vehiculo",
+            {"marca": "Hyundai", "modelo": "Santa Fe"},
+        )
     )
 
     assert result["status"] == "success"
@@ -191,14 +193,14 @@ def test_executor_buscar_por_vehiculo(registered_tools):
 
 
 def test_executor_contar_casos_por_marca(registered_tools):
-    result = tool_executor.execute("contar_casos_por_marca", {"marca": "Tesla"})
+    result = asyncio.run(tool_executor.execute("contar_casos_por_marca", {"marca": "Tesla"}))
 
     assert result["status"] == "success"
     assert "1 caso" in result["output"]
 
 
 def test_executor_unknown_tool_returns_error():
-    result = tool_executor.execute("herramienta_inexistente", {})
+    result = asyncio.run(tool_executor.execute("herramienta_inexistente", {}))
 
     assert result["status"] == "error"
     assert "no existe" in result["output"]
@@ -266,5 +268,5 @@ def test_ollama_tool_calling_live(registered_tools):
     if isinstance(arguments, str):
         arguments = json.loads(arguments)
 
-    execution = tool_executor.execute(tool_name, arguments)
+    execution = asyncio.run(tool_executor.execute(tool_name, arguments))
     assert execution["status"] == "success"

@@ -68,6 +68,8 @@ class Settings(BaseSettings):
 
     # --- API de citas (crearCitaAPI) ---
     CITAS_API_BASE_URL: str = "https://lacasadelosfrenos-api.onrender.com"
+    # Secreto compartido con la API interna (header X-Internal-Secret).
+    INTERNAL_API_SECRET: str = ""
 
     # --- Rutas de datos ---
     RAW_DATA_PATH: str = "data/raw"

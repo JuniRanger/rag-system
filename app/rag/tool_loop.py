@@ -1,4 +1,3 @@
-import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import date
@@ -219,7 +218,7 @@ async def _execute_tool_rounds(
                     ),
                 }
             else:
-                result = await asyncio.to_thread(tool_executor.execute, tool_name, arguments)
+                result = await tool_executor.execute(tool_name, arguments)
 
             tools_used.append(
                 {

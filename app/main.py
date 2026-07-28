@@ -12,6 +12,7 @@ from app.core.providers import (
 )
 from app.llm.model_config import get_active_ollama_model, is_ollama_model_verified
 from app.tools import register_all_tools
+from app.services.api_client import close_api_client, require_internal_api_secret
 
 
 @asynccontextmanager
@@ -27,7 +28,11 @@ async def lifespan(app: FastAPI):
 
     if provider_type not in {"LOCAL", "AZURE"}:
         raise ValueError(f"PROVIDER_TYPE no soportado: {settings.PROVIDER_TYPE}")
-    
+
+    if settings.ENABLE_RAG_TOOLS:
+        require_internal_api_secret()
+        logger.info("INTERNAL_API_SECRET: configurada (valor no se muestra)")
+ 
     logger.info("Precargando modelo de embeddings en RAM...")
     embedder = get_embedding_provider()
     # Forzar una inferencia dummy para que el modelo quede caliente
@@ -70,6 +75,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Al apagar ──
+    await close_api_client()
     logger.info("Apagando el sistema RAG...")
 
 
