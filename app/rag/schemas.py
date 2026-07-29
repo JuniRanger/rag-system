@@ -188,6 +188,8 @@ class FunctionCallRecord(BaseModel):
 
 
 class RAGResponseMetadata(BaseModel):
+    """Metadata interna de observabilidad. No serializar hacia el frontend."""
+
     latency_ms: int = 0
     ttft_ms: int = 0
     tokens_per_second: float = 0.0
@@ -204,6 +206,8 @@ class RAGResponseMetadata(BaseModel):
 
 
 class RAGResponse(BaseModel):
+    """Respuesta interna completa (logs, evaluación, scripts)."""
+
     success: bool
     conversation_id: str
     answer: str
@@ -211,3 +215,26 @@ class RAGResponse(BaseModel):
     working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
     sources: list[SourceReference] = Field(default_factory=list)
     metadata: RAGResponseMetadata = Field(default_factory=RAGResponseMetadata)
+
+
+class PublicRAGResponse(BaseModel):
+    """
+    DTO público para el frontend.
+
+    Solo incluye lo necesario para mostrar la respuesta al usuario.
+    Sin summary interno, metadata, tools, tokens, sources ni contexto.
+    """
+
+    success: bool
+    conversation_id: str
+    answer: str
+    working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
+
+    @classmethod
+    def from_internal(cls, response: "RAGResponse") -> "PublicRAGResponse":
+        return cls(
+            success=response.success,
+            conversation_id=response.conversation_id,
+            answer=response.answer,
+            working_memory=response.working_memory,
+        )

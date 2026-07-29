@@ -1,6 +1,7 @@
 from app.rag.schemas import (
     ChatMessage,
     FunctionCallRecord,
+    PublicRAGResponse,
     RAGQueryOptions,
     RAGRequest,
     RAGResponse,
@@ -15,6 +16,7 @@ from app.rag.schemas import (
 __all__ = [
     "ChatMessage",
     "FunctionCallRecord",
+    "PublicRAGResponse",
     "RAGQueryOptions",
     "RAGRequest",
     "RAGResponse",

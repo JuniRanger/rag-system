@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from app.rag.chain import RAGChain
 from app.rag.context_plan import GenerationPlan
 from app.rag.context_plan import plan_request
-from app.rag.mappers import build_function_calls, build_source_references, error_response, estimate_tokens
+from app.rag.mappers import build_function_calls, build_source_references, error_response, estimate_tokens, log_internal_response, to_public_payload
 from app.rag.memory import ConversationSummarizer, should_refresh_summary
 from app.rag.schemas import RAGRequest, RAGResponse, RAGResponseMetadata
 from app.rag.sse import format_sse_event
@@ -14,6 +14,8 @@ from app.embeddings.base import BaseEmbeddingProvider
 from app.llm.base import BaseLLMProvider
 from app.retrieval.reranker import Reranker
 from app.vectorstore.base import BaseVectorStoreProvider
+
+PUBLIC_ERROR_MESSAGE = "Ocurrió un error interno. Intenta de nuevo más tarde."
 
 
 def _compute_stream_metrics(
@@ -106,7 +108,7 @@ class RAGPipeline:
             summary = await self._resolve_summary(request, result["answer"])
             latency_ms = int((time.perf_counter() - started_at) * 1000)
 
-            return RAGResponse(
+            response = RAGResponse(
                 success=True,
                 conversation_id=conversation_id,
                 answer=result["answer"],
@@ -115,15 +117,18 @@ class RAGPipeline:
                 sources=result["sources"],
                 metadata=_build_metadata(plan, result, latency_ms),
             )
+            log_internal_response(response)
+            return response
         except Exception as error:
             logger.error(f"Error en RAG Pipeline: {error}")
             response = error_response(
                 conversation_id,
-                f"Error interno del sistema: {error}",
+                PUBLIC_ERROR_MESSAGE,
                 summary=request.summary,
                 working_memory=request.working_memory,
             )
             response.metadata.latency_ms = int((time.perf_counter() - started_at) * 1000)
+            log_internal_response(response)
             return response
 
     async def run_stream(self, request: RAGRequest) -> AsyncIterator[str]:
@@ -134,12 +139,14 @@ class RAGPipeline:
         if request.message.role != "user":
             yield format_sse_event(
                 "done",
-                error_response(
-                    conversation_id,
-                    "El mensaje actual debe tener role='user'.",
-                    summary=request.summary,
-                    working_memory=request.working_memory,
-                ).model_dump(),
+                to_public_payload(
+                    error_response(
+                        conversation_id,
+                        "El mensaje actual debe tener role='user'.",
+                        summary=request.summary,
+                        working_memory=request.working_memory,
+                    )
+                ),
             )
             return
 
@@ -147,12 +154,14 @@ class RAGPipeline:
         if not query:
             yield format_sse_event(
                 "done",
-                error_response(
-                    conversation_id,
-                    "El mensaje no puede estar vacío.",
-                    summary=request.summary,
-                    working_memory=request.working_memory,
-                ).model_dump(),
+                to_public_payload(
+                    error_response(
+                        conversation_id,
+                        "El mensaje no puede estar vacío.",
+                        summary=request.summary,
+                        working_memory=request.working_memory,
+                    )
+                ),
             )
             return
 
@@ -199,34 +208,34 @@ class RAGPipeline:
                 "tools_used": stream_meta.get("tools_used", []),
             }
 
-            yield format_sse_event(
-                "done",
-                RAGResponse(
-                    success=True,
-                    conversation_id=conversation_id,
-                    answer=answer,
-                    summary=summary,
-                    working_memory=plan.working_memory,
-                    sources=sources,
-                    metadata=_build_metadata(
-                        plan,
-                        stream_result,
-                        latency_ms,
-                        ttft_ms=ttft_ms,
-                        tokens_per_second=tokens_per_second,
-                    ),
-                ).model_dump(),
+            response = RAGResponse(
+                success=True,
+                conversation_id=conversation_id,
+                answer=answer,
+                summary=summary,
+                working_memory=plan.working_memory,
+                sources=sources,
+                metadata=_build_metadata(
+                    plan,
+                    stream_result,
+                    latency_ms,
+                    ttft_ms=ttft_ms,
+                    tokens_per_second=tokens_per_second,
+                ),
             )
+            log_internal_response(response)
+            yield format_sse_event("done", to_public_payload(response))
         except Exception as error:
             logger.error(f"Error en RAG Pipeline (stream): {error}")
             response = error_response(
                 conversation_id,
-                f"Error interno del sistema: {error}",
+                PUBLIC_ERROR_MESSAGE,
                 summary=request.summary,
                 working_memory=request.working_memory,
             )
             response.metadata.latency_ms = int((time.perf_counter() - started_at) * 1000)
-            yield format_sse_event("done", response.model_dump())
+            log_internal_response(response)
+            yield format_sse_event("done", to_public_payload(response))
 
     async def _resolve_summary(self, request: RAGRequest, answer: str) -> str:
         if not should_refresh_summary(request):

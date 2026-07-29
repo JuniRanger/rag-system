@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     if settings.ENABLE_RAG_TOOLS:
         require_internal_api_secret()
         logger.info("INTERNAL_API_SECRET: configurada (valor no se muestra)")
- 
+
     logger.info("Precargando modelo de embeddings en RAM...")
     embedder = get_embedding_provider()
     # Forzar una inferencia dummy para que el modelo quede caliente

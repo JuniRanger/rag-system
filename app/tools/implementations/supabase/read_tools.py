@@ -1,5 +1,3 @@
-import json
-
 from app.core.config import settings
 from app.core.sanitize import (
     SanitizeError,
@@ -25,43 +23,56 @@ from app.tools.schemas.supabase import (
 )
 
 DEFAULT_LIMIT = 20
+# Máximo de casos que se pasan al LLM (evita dumps masivos de la BD).
+MAX_CASES_FOR_LLM = 3
+
+# Campos mínimos útiles para diagnóstico (sin IDs ni schema de BD).
+_SAFE_CASE_FIELDS = (
+    ("problema", "Problema"),
+    ("diagnostico", "Diagnóstico"),
+    ("solucion", "Solución"),
+)
 
 
 def _table():
     return get_supabase_client().table(settings.SUPABASE_TABLE)
 
 
+def _format_case_for_llm(row: dict, index: int) -> list[str]:
+    """Proyecta un registro a texto mínimo para el LLM (sin IDs ni metadata)."""
+    lines = [f"Caso {index}:"]
+    vehicle_parts = [
+        str(row.get("vehiculo_marca") or "").strip(),
+        str(row.get("vehiculo_modelo") or "").strip(),
+    ]
+    vehicle = " ".join(part for part in vehicle_parts if part)
+    if vehicle:
+        lines.append(f"Vehículo: {vehicle}")
+
+    for key, label in _SAFE_CASE_FIELDS:
+        value = row.get(key)
+        if value not in (None, ""):
+            lines.append(f"{label}: {value}")
+
+    if len(lines) == 1:
+        lines.append("(sin detalle clínico útil en el registro)")
+    return lines
+
+
 def _format_rows(rows: list[dict], header: str) -> str:
     if not rows:
-        return f"{header}\nNo se encontraron registros."
+        return f"{header}\nNo se encontraron casos relevantes."
 
-    lines = [header, f"Total: {len(rows)} registro(s)."]
-    for index, row in enumerate(rows, 1):
-        summary_parts = []
-        for key in (
-            "vehiculo_marca",
-            "vehiculo_modelo",
-            "categoria_problema",
-            "problema",
-            "diagnostico",
-            "solucion",
-            "severidad",
-            "repair_status",
-        ):
-            value = row.get(key)
-            if value not in (None, ""):
-                summary_parts.append(f"{key}: {value}")
-        lines.append(f"\n[{index}]")
-        if summary_parts:
-            lines.extend(summary_parts)
-        else:
-            # Sin volcar id ni claves internas crudas.
-            safe_row = {
-                k: v
-                for k, v in row.items()
-                if str(k).lower() != "id" and not str(k).lower().endswith("_id")
-            }
-            lines.append(json.dumps(safe_row, ensure_ascii=False, default=str))
+    limited = rows[:MAX_CASES_FOR_LLM]
+    lines = [
+        header,
+        f"Se muestran {len(limited)} caso(s) relevantes"
+        + (f" de {len(rows)} encontrados." if len(rows) > len(limited) else "."),
+        "Usa solo problema, diagnóstico y solución. No menciones IDs ni estructura interna.",
+    ]
+    for index, row in enumerate(limited, 1):
+        lines.append("")
+        lines.extend(_format_case_for_llm(row, index))
     return "\n".join(lines)
 
 

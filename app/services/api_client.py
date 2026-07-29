@@ -49,6 +49,7 @@ class InternalApiClient:
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         connect_timeout: float = DEFAULT_CONNECT_TIMEOUT_SECONDS,
         default_headers: Mapping[str, str] | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         resolved_secret = (secret if secret is not None else settings.INTERNAL_API_SECRET) or ""
         resolved_secret = resolved_secret.strip()
@@ -62,6 +63,7 @@ class InternalApiClient:
         self._base_url = (base_url if base_url is not None else "").rstrip("/")
         self._timeout = httpx.Timeout(timeout, connect=connect_timeout)
         self._extra_headers = dict(default_headers or {})
+        self._transport = transport
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -93,11 +95,15 @@ class InternalApiClient:
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
-                base_url=self._base_url or None,
-                timeout=self._timeout,
-                headers=self._auth_headers(),
-            )
+            kwargs: dict[str, Any] = {
+                "timeout": self._timeout,
+                "headers": self._auth_headers(),
+            }
+            if self._base_url:
+                kwargs["base_url"] = self._base_url
+            if self._transport is not None:
+                kwargs["transport"] = self._transport
+            self._client = httpx.AsyncClient(**kwargs)
         return self._client
 
     async def aclose(self) -> None:

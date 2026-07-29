@@ -11,7 +11,8 @@ from app.api.schemas import (
     SupabaseWebhookPayload,
     SupabaseWebhookResponse,
 )
-from app.rag.schemas import RAGRequest, RAGResponse
+from app.rag.schemas import RAGRequest, PublicRAGResponse
+from app.rag.mappers import to_public_response
 from app.api.supabase_auth import verify_sync_secret, verify_webhook_secret
 from app.ingestion.pipeline import IngestionPipeline
 from app.ingestion.supabase_sync import SupabaseSyncService
@@ -167,11 +168,12 @@ async def supabase_webhook(payload: SupabaseWebhookPayload):
 
 # ─── CONSULTA RAG ─────────────────────────────────────────────────────────────
 
-@router.post("/query", response_model=RAGResponse, tags=["RAG"])
+@router.post("/query", response_model=PublicRAGResponse, tags=["RAG"])
 async def query_rag(request: RAGRequest):
     """
     Consulta conversacional al sistema RAG.
     Acepta historial reciente, resumen y opciones de recuperación/generación.
+    La respuesta pública no incluye metadata interna ni tools.
     """
     logger.info(
         f"Request de consulta | conversation_id={request.conversation_id} | "
@@ -180,18 +182,20 @@ async def query_rag(request: RAGRequest):
 
     try:
         pipeline = create_rag_pipeline(use_reranker=request.options.use_reranker)
-        return await pipeline.run(request)
+        internal = await pipeline.run(request)
+        return to_public_response(internal)
 
     except Exception as e:
         logger.error(f"Error en consulta RAG: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno del sistema.")
 
 
 @router.post("/query/stream", tags=["RAG"])
 async def query_rag_stream(request: RAGRequest):
     """
     Consulta conversacional con streaming SSE.
-    Eventos: token (fragmentos de respuesta), done (respuesta final + summary + metadata).
+    Eventos: token (fragmentos de respuesta), done (answer + working_memory).
+    Sin summary interno, metadata, tools ni sources en el evento done.
     Con tools activas: las rondas de function calling corren antes; luego se streamea la respuesta final.
     """
     logger.info(

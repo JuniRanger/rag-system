@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterator
 
 from app.core.config import settings
-from app.core.documents import source_label
 from app.core.logger import logger
 from app.core.supabase import supabase_configured
 from app.llm.base import BaseLLMProvider
@@ -255,12 +254,7 @@ class ResponseGenerator:
         context_parts = []
         for index, chunk in enumerate(chunks, 1):
             text = chunk["text"]
-            metadata = chunk.get("metadata", {})
-            header_parts = [f"Fragmento {index}"]
-            record_id = metadata.get("record_id")
-            if record_id is not None:
-                header_parts.append(f"ID registro: {record_id}")
-            header_parts.append(f"Fuente: {source_label(chunk)}")
-            context_parts.append(f"[{' | '.join(header_parts)}]\n{text}")
+            # Sin IDs de registro ni etiquetas de tabla: solo texto útil para diagnóstico.
+            context_parts.append(f"[Fragmento {index}]\n{text}")
 
         return "\n\n---\n\n".join(context_parts)

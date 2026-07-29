@@ -1,11 +1,13 @@
 from app.core.documents import source_label, stable_chunk_id
 from app.rag.schemas import (
     FunctionCallRecord,
+    PublicRAGResponse,
     RAGResponse,
     RAGResponseMetadata,
     SourceReference,
     WorkingMemory,
 )
+from app.core.logger import logger
 
 
 def build_source_references(chunks: list[dict]) -> list[SourceReference]:
@@ -51,6 +53,31 @@ def estimate_tokens(text: str) -> int:
     if not text:
         return 0
     return max(1, len(text) // 4)
+
+
+def to_public_response(response: RAGResponse) -> PublicRAGResponse:
+    """Proyecta la respuesta interna al DTO seguro para el frontend."""
+    return PublicRAGResponse.from_internal(response)
+
+
+def to_public_payload(response: RAGResponse) -> dict:
+    """Dict público para SSE / JSON sin metadata interna."""
+    return to_public_response(response).model_dump()
+
+
+def log_internal_response(response: RAGResponse) -> None:
+    """Observabilidad servidor: metadata completa, sin enviarla al cliente."""
+    meta = response.metadata
+    logger.info(
+        "RAG response interna | "
+        f"conversation_id={response.conversation_id} | "
+        f"intent={meta.intent} | rag={meta.rag_executed} | "
+        f"latency_ms={meta.latency_ms} | "
+        f"tokens_in={meta.tokens_input} tokens_out={meta.tokens_output} | "
+        f"chunks={meta.used_chunks}/{meta.retrieved_chunks} | "
+        f"tools={len(meta.function_calls)} | "
+        f"sources={len(response.sources)}"
+    )
 
 
 def error_response(
